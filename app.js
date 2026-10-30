@@ -6,6 +6,48 @@
 
 const $ = (selector) => document.querySelector(selector);
 
+function getUserStorageKey(key) {
+    try {
+        const storedUser = localStorage.getItem('wolf_current_user');
+        if (!storedUser) return `wolf_guest_${key}`;
+        
+        const currentUser = JSON.parse(storedUser);
+        const userEmail = (currentUser && currentUser.email) ? currentUser.email : 'guest';
+        return `wolf_${userEmail}_${key}`;
+    } catch (e) {
+        console.error("Storage key error:", e);
+        return `wolf_guest_${key}`;
+    }
+}
+
+// 3. Synchronous local loader utilizing user-specific storage key
+function loadProjectsFromLocal() {
+    try {
+        const STORAGE_KEY = getUserStorageKey('projects');
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (!saved) return [];  
+        const parsed = JSON.parse(saved);  
+        return Array.isArray(parsed) ? parsed : [];
+    } catch (error) {
+        console.error("Local storage error:", error);
+        return [];
+    }
+}
+
+// 4. Synchronous local saver utilizing user-specific storage key
+function saveProjectsToLocal() {
+    try {
+        const STORAGE_KEY = getUserStorageKey('projects');
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
+    } catch (error) {
+        console.error("Local storage error:", error);
+    }
+}
+
+// Load safely on boot
+let projects = loadProjectsFromLocal();
+let activeProjectId = null;
+
 // ========================================
 // THEME CUSTOMIZER SYSTEM
 // ========================================
@@ -22,12 +64,12 @@ function applyTheme(themeName) {
         document.body.classList.add("theme-crimson-alpha");
     } // "wolf-cyber" uses default :root variables
 
-    // Save selection to LocalStorage
-    localStorage.setItem("wolf_workspace_theme", themeName);
+    // Saving theme per user
+localStorage.setItem(getUserStorageKey("theme"), themeName);
 }
-
 function initTheme() {
-    const savedTheme = localStorage.getItem("wolf_workspace_theme") || "wolf-cyber";
+    // Loading theme per user
+const savedTheme = localStorage.getItem(getUserStorageKey("theme"))  || "wolf-cyber";
     
     if (themeSelect) {
         themeSelect.value = savedTheme;
@@ -113,9 +155,6 @@ const sidebarOverlay = $("#sidebarOverlay");
 
 const STORAGE_KEY = "wolfWorkspaceProjects_v1";
 
-// Load synchronously on boot so 'projects' is IMMEDIATELY an array
-let projects = loadProjectsFromLocal();
-let activeProjectId = null;
 
 // ========================================
 // DATA STORAGE (FIREBASE CLOUD FIRESTORE + LOCAL FALLBACK)
@@ -176,7 +215,9 @@ async function syncProjectsFromCloud() {
     }
 }
 
-// Unified save function (Saves locally first, then syncs to Cloud if logged in)
+
+
+// 2. Unified save function (Saves locally first using user-specific key, then syncs to Cloud)
 async function saveProjects() {
     saveProjectsToLocal(); // Instant local save
 
@@ -194,26 +235,6 @@ async function saveProjects() {
         console.error("Unable to save projects to Cloud:", error);  
         showToast("⚠️ Cloud sync failed. Changes saved locally.", false);  
         return false;  
-    }
-}
-// Synchronous local loader for instant startup & offline resilience
-function loadProjectsFromLocal() {
-    try {
-        const saved = localStorage.getItem(STORAGE_KEY);
-        if (!saved) return [];  
-        const parsed = JSON.parse(saved);  
-        return Array.isArray(parsed) ? parsed : [];
-    } catch (error) {
-        console.error("Local storage error:", error);
-        return [];
-    }
-}
-
-function saveProjectsToLocal() {
-    try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
-    } catch (error) {
-        console.error("Local storage error:", error);
     }
 }
 
@@ -1657,38 +1678,73 @@ document.addEventListener('DOMContentLoaded', () => {
     // 2. Password Visibility Toggles
     setupPasswordToggles();
 
-    // 3. Signup Form Handler (Firebase Auth)
-    if (signupForm) {
-        signupForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const nameEl = document.getElementById('signupName');
-            const emailEl = document.getElementById('signupEmail');
-            const passwordEl = document.getElementById('signupPassword');
-            const submitBtn = signupForm.querySelector('button[type="submit"]');
+ // Helper: Set user session and render dashboard (fixes blank screen)
+function handleLogin(email) {
+    // Use the 'email' parameter correctly
+    const currentUserData = { email: email }; 
+    localStorage.setItem('wolf_current_user', JSON.stringify(currentUserData));
 
-            if (!nameEl || !emailEl || !passwordEl || !submitBtn) return;
+    // Hide auth views / show app
+    const authContainer = document.getElementById('auth-container');
+    const appContainer = document.getElementById('app-container');
+    
+    if (authContainer) authContainer.style.display = 'none';
+    if (appContainer) appContainer.style.display = 'block';
 
-            const email = emailEl.value;
-            const password = passwordEl.value;
+    // Reload projects scoped to this exact email
+    if (typeof loadProjects === 'function') {
+        loadProjects();
+    }
+    if (typeof renderWorkspace === 'function') {
+        renderWorkspace();
+    }
+}
 
-            // Lock button & change state
-            const originalText = submitBtn.innerHTML;
-            submitBtn.disabled = true;
-            submitBtn.style.background = '#f59e0b';
-            submitBtn.style.cursor = 'not-allowed';
-            submitBtn.innerHTML = `⏳ Sending Verification...`;
+// 3. Signup Form Handler
+if (signupForm) {
+    signupForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const nameEl = document.getElementById('signupName');
+        const emailEl = document.getElementById('signupEmail');
+        const passwordEl = document.getElementById('signupPassword');
+        const submitBtn = signupForm.querySelector('button[type="submit"]');
 
-            try {
-                // Create user with Firebase Auth
-                const userCredential = await auth.createUserWithEmailAndPassword(email, password);
-                
-                // Automatically send Firebase verification email
-                await userCredential.user.sendEmailVerification();
+        if (!nameEl || !emailEl || !passwordEl || !submitBtn) return;
 
-                if (displayUserEmail) displayUserEmail.textContent = email;
-                signupView.classList.add('hidden');
-                verifyView.classList.remove('hidden');
-                // Resend Verification Email Button
+        const email = emailEl.value;
+        const password = passwordEl.value;
+
+        const originalText = submitBtn.innerHTML;
+        submitBtn.disabled = true;
+        submitBtn.style.background = '#f59e0b';
+        submitBtn.style.cursor = 'not-allowed';
+        submitBtn.innerHTML = `⏳ Sending Verification...`;
+
+        try {
+            const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+            await userCredential.user.sendEmailVerification();
+
+            if (displayUserEmail) displayUserEmail.textContent = email;
+            if (signupView) signupView.classList.add('hidden');
+            if (verifyView) verifyView.classList.remove('hidden');
+
+        } catch (err) {
+            console.error('Firebase Signup Error:', err);
+            alert('Error: ' + err.message);
+            nameEl.value = '';
+            emailEl.value = '';
+            passwordEl.value = '';
+            nameEl.focus();
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.style.background = '';
+            submitBtn.style.cursor = 'pointer';
+            submitBtn.innerHTML = originalText;
+        }
+    });
+}
+
+// Resend Verification Email Button (Moved Outside)
 const resendBtn = document.getElementById('resendEmailBtn');
 if (resendBtn) {
     resendBtn.addEventListener('click', async () => {
@@ -1706,17 +1762,16 @@ if (resendBtn) {
     });
 }
 
-       // Verification Check Button Handler
+// Verification Check Button Handler (Moved Outside)
 const checkVerifyBtn = document.getElementById('checkVerificationBtn');
 if (checkVerifyBtn) {
     checkVerifyBtn.addEventListener('click', async () => {
         const user = auth.currentUser;
-        if (user) {
-            // Reload user data from Firebase servers to pull updated emailVerified status
+        if (user) {    
             await user.reload(); 
             if (auth.currentUser.emailVerified) {
                 alert('Email verified successfully! Welcome to Wolf Workspace.');
-                syncProfileAndHideModal(auth.currentUser);
+                handleLogin(auth.currentUser.email);
             } else {
                 alert('Email is not verified yet. Please check your Gmail inbox/spam and tap the verification link first.');
             }
@@ -1726,51 +1781,56 @@ if (checkVerifyBtn) {
     });
 }
 
-            } catch (err) {
-                console.error('Firebase Signup Error:', err);
-                alert('Error: ' + err.message);
-                
-                // Clear fields on error
-                nameEl.value = '';
-                emailEl.value = '';
-                passwordEl.value = '';
-                nameEl.focus();
-            } finally {
-                submitBtn.disabled = false;
-                submitBtn.style.background = '';
-                submitBtn.style.cursor = 'pointer';
-                submitBtn.innerHTML = originalText;
+// 4. Login Form Handler
+if (loginForm) {
+    loginForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const email = document.getElementById('loginEmail')?.value;
+        const password = document.getElementById('loginPassword')?.value;
+
+        try {
+            const userCredential = await auth.signInWithEmailAndPassword(email, password);
+            
+            if (!userCredential.user.emailVerified) {
+                alert('Please check your email and click the verification link before logging in.');
+                await auth.signOut();
+                return;
             }
-        });
+
+            // Save user session & trigger live UI render instantly
+            handleLogin(userCredential.user.email);
+
+        } catch (err) {
+            console.error('Firebase Login Error:', err);
+            alert('Login Failed: ' + err.message);
+        }
+    });
+}
+   
+// 5. Standalone Logout Function
+function handleLogout() {
+    // Clear local storage sessions and cached user data
+    localStorage.removeItem('wolf_current_user');
+    
+    // Clear global state array if declared globally
+    if (typeof currentProjects !== 'undefined') {
+        currentProjects = [];
     }
 
-    // 4. Login Form Handler (Firebase Auth)
-    if (loginForm) {
-        loginForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const email = document.getElementById('loginEmail')?.value;
-            const password = document.getElementById('loginPassword')?.value;
+    // Toggle views if DOM elements exist
+    const appContainer = document.getElementById('app-container');
+    const authContainer = document.getElementById('auth-container');
+    
+    if (appContainer) appContainer.style.display = 'none';
+    if (authContainer) authContainer.style.display = 'block';
 
-            try {
-                const userCredential = await auth.signInWithEmailAndPassword(email, password);
-                
-                // Optional: Ensure email is verified before letting them enter
-                if (!userCredential.user.emailVerified) {
-                    alert('Please check your email and click the verification link before logging in.');
-                    await auth.signOut();
-                    return;
-                }
-
-                syncProfileAndHideModal(userCredential.user);
-
-            } catch (err) {
-                console.error('Firebase Login Error:', err);
-                alert('Login Failed: ' + err.message);
-            }
-        });
+    // Clear DOM lists / re-evaluate UI
+    if (typeof renderWorkspace === 'function') {
+        renderWorkspace();
     }
+}
 
-//5. EXPLICIT LOGOUT HANDLER
+// 5. Explicit Event Listener
 const logoutBtn = document.getElementById("logoutBtn");
 if (logoutBtn) {
     logoutBtn.addEventListener("click", async () => {
@@ -1780,18 +1840,21 @@ if (logoutBtn) {
 
         if (confirmed) {
             try {
+                // Sign out Firebase/Auth if active
                 if (typeof auth !== 'undefined' && auth.signOut) {
                     await auth.signOut();
                 }
-                // Reload window to re-evaluate auth state from scratch
-                window.location.reload();
             } catch (err) {
                 console.error("Logout error:", err);
+            } finally {
+                // Always clean local storage & refresh to reset full state
+                handleLogout();
                 window.location.reload();
             }
         }
     });
 }
+
 });
 // Helper: Add Password Show/Hide Toggles
 function setupPasswordToggles() {
@@ -1822,19 +1885,50 @@ function setupPasswordToggles() {
         input.parentNode.appendChild(toggleBtn);
     });
 }
-
-// Helper: Sync User Profile to Dashboard
+// Helper: Sync User Profile and Show Dashboard
 function syncProfileAndHideModal(user) {
     const authModal = document.getElementById('authModal');
-    if (authModal) authModal.classList.add('hidden');
+    const dashboardView = document.getElementById('dashboardView');
+    const projectWorkspace = document.getElementById('projectWorkspace');
 
+    // Hide authentication modal
+    if (authModal) {
+        authModal.classList.add('hidden');
+    }
+
+    // Hide project workspace
+    if (projectWorkspace) {
+        projectWorkspace.classList.add('hidden');
+    }
+
+    // Reveal dashboard
+    if (dashboardView) {
+        dashboardView.classList.remove('hidden');
+    }
+
+    // Update user profile
     const userNameEl = document.getElementById('userNameDisplay');
     const userEmailEl = document.getElementById('userEmailDisplay');
     const userAvatarEl = document.getElementById('userAvatar');
 
-    if (userNameEl) userNameEl.textContent = user.displayName || user.email.split('@')[0];
-    if (userEmailEl) userEmailEl.textContent = user.email;
-    if (userAvatarEl) userAvatarEl.textContent = user.email.charAt(0).toUpperCase();
+    if (userNameEl) {
+        userNameEl.textContent = user.displayName || user.email.split('@')[0];
+    }
+
+    if (userEmailEl) {
+        userEmailEl.textContent = user.email;
+    }
+
+    if (userAvatarEl) {
+        userAvatarEl.textContent = user.email.charAt(0).toUpperCase();
+    }
+
+    // Render dashboard
+    if (typeof renderDashboard === 'function') {
+        renderDashboard();
+    }
+
+    console.log("🐺 Dashboard successfully activated.");
 }
       
 function renderSettings() {
@@ -2191,13 +2285,19 @@ const emptyTrashBtn = $("#emptyTrashBtn");
 const modalEmptyTrashBtn = $("#modalEmptyTrashBtn");
 const trashItemsList = $("#trashItemsList");
 
-let trashBin = JSON.parse(localStorage.getItem("wolf_workspace_trash")) || [];
+let trashBin = JSON.parse(localStorage.getItem(getUserStorageKey("trash"))) || [];
 
+
+// Function to save trash bin locally
 function saveTrash() {
-    localStorage.setItem("wolf_workspace_trash", JSON.stringify(trashBin));
+    localStorage.setItem(getUserStorageKey("trash"), JSON.stringify(trashBin));
     updateTrashUI();
 }
-
+// Function to load trash bin
+function loadTrash() {
+    trashBin = JSON.parse(localStorage.getItem(getUserStorageKey("trash"))) || [];
+    return trashBin;
+}
 function updateTrashUI() {
     const trashCountText = $("#trashCountText");
     if (trashCountText) {
@@ -3157,23 +3257,18 @@ if (typeof auth !== 'undefined') {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-    // 1. Initialize dashboard views
-    const loginView = document.getElementById("loginView");
-    const dashboardView = document.getElementById("dashboardView");
     const loader = document.getElementById("appLoader");
 
-    if (loginView) loginView.hidden = true;
-    if (dashboardView) dashboardView.classList.remove("hidden");
-
+    // Load local projects on boot
     if (typeof loadProjects === "function") loadProjects();
     if (typeof renderDashboard === "function") renderDashboard();
 
-    // 2. Smoothly dismiss the wolf loader after full initialization
+    // Smoothly dismiss the wolf loader after full initialization
     if (loader) {
         setTimeout(() => {
             loader.classList.add("fade-out");
             setTimeout(() => loader.remove(), 650);
-        }, 750); // 750ms allows user to see the slick wolf branding
+        }, 750); 
     }
-  console.log("🐺 Wolf Workspace is ready.");
+    console.log("🐺 Wolf Workspace is ready.");
 });
