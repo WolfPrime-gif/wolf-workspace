@@ -1,0 +1,1115 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wolf Workspace</title>
+    <link rel="stylesheet" href="style.css">
+        <!-- Firebase App (Core) -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <!-- Firebase Auth -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <!-- Firebase Firestore (Add this line!) -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <script>
+      // Your web app's Firebase configuration
+      const firebaseConfig = {
+        apiKey: "AIzaSyC8MD3ijHFL1We35XaHHoCD3ddKYuUXzlI",
+        authDomain: "wolf-workspace.firebaseapp.com",
+        projectId: "wolf-workspace",
+        storageBucket: "wolf-workspace.firebasestorage.app",
+        messagingSenderId: "494554296263",
+        appId: "1:494554296263:web:ddeff805a64878651db3e2",
+        measurementId: "G-8J3X72PK05"
+      };
+
+      // Initialize Firebase & Auth
+      firebase.initializeApp(firebaseConfig);
+      const auth = firebase.auth();
+      const db = firebase.firestore();
+
+    </script>
+
+</head>
+
+<body>
+<!-- WOLF WORKSPACE SPLASH LOADER -->
+<div id="appLoader" class="app-loader">
+    <div class="loader-card">
+        <div class="wolf-avatar-glow">
+            <span class="wolf-icon">🐺</span>
+        </div>
+        <h1 class="loader-title">WOLF WORKSPACE</h1>
+        <p class="loader-subtitle">Local-First Secure Vault</p>
+        
+        <div class="loader-bar-container">
+            <div class="loader-bar-fill"></div>
+        </div>
+        
+        <span class="loader-status">Initializing Workspace...</span>
+    </div>
+</div>
+
+        <!-- AUTH MODAL CONTAINER -->
+<div id="authModal" class="modal">
+    <div class="modal-content auth-card">
+        
+        <!-- 1. LOGIN VIEW -->
+      <!-- Add hidden attribute so it doesn't flash on load -->
+      <div id="loginView" class="auth-view" hidden>
+            <div class="modal-header auth-header">
+          <span class="auth-logo">🐺</span>
+                <h2>Wolf Access</h2>
+            </div>
+            <p class="auth-subtitle">Enter your credentials to enter the workspace.</p>
+            
+            <form id="loginForm" class="auth-form">
+                <div class="input-group">
+                    <input type="email" id="loginEmail" placeholder="Email Address" required>
+                </div>
+                <div class="input-group">
+                    <input type="password" id="loginPassword" placeholder="Password" required>
+                </div>
+                <div style="text-align: right; margin-bottom: 14px;">
+                    <a href="#" id="showForgotBtn" style="font-size: 0.8rem; color: var(--accent); text-decoration: none; font-weight: 600;">Forgot Password?</a>
+                </div>
+                <button type="submit" class="btn-primary auth-submit-btn">Initialize Session</button>
+            </form>
+            
+            <p class="auth-switch">New to Wolf Workspace? <a href="#" id="showSignupBtn">Create Account</a></p>
+            
+            <!-- Professional Footer -->
+            <div class="auth-footer">
+                <div class="footer-divider"></div>
+                <div class="footer-info">
+                    <span>🔒 Local-First Secure Vault</span>
+                    <span class="footer-brand">@building_yourself_</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. SIGN UP VIEW -->
+        <div id="signupView" class="auth-view hidden">
+            <div class="modal-header auth-header">
+                <span class="auth-logo">🐺</span>
+                <h2>Create Account</h2>
+            </div>
+            <p class="auth-subtitle">Register your secure local profile.</p>
+            
+            <form id="signupForm" class="auth-form">
+                <div class="input-group">
+                    <input type="text" id="signupName" placeholder="Full Name" required>
+                </div>
+                <div class="input-group">
+                    <input type="email" id="signupEmail" placeholder="Email Address" required>
+                </div>
+                <div class="input-group">
+                    <input type="password" id="signupPassword" placeholder="Create Password" required>
+                </div>
+                <button type="submit" class="btn-primary auth-submit-btn">Register Account</button>
+            </form>
+            
+            <p class="auth-switch">Already have an account? <a href="#" id="showLoginBtn">Initialize Session</a></p>
+            
+            <!-- Professional Footer -->
+            <div class="auth-footer">
+                <div class="footer-divider"></div>
+                <div class="footer-info">
+                    <span>🔒 Local-First Secure Vault</span>
+                    <span class="footer-brand">@building_yourself_</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. EMAIL VERIFICATION PENDING VIEW -->
+        <div id="verifyView" class="auth-view hidden">
+            <div class="modal-header auth-header">
+                <span class="auth-logo">✉️</span>
+                <h2>Verify Your Email</h2>
+            </div>
+            <div class="verify-notice">
+                <div class="verify-icon">📬</div>
+                <p>We’ve sent a verification link to your Gmail address:</p>
+                <p class="target-email" id="displayUserEmail">user@gmail.com</p>
+                <p class="verify-subtext">Please check your inbox and click the verification link to activate your workspace access.</p>
+            </div>
+            <div class="modal-actions" style="display: flex; flex-direction: column; gap: 10px; margin-top: 20px;">
+                <button id="simulateVerifyBtn" class="btn-primary" style="background: var(--surface-light, #1e293b); color: var(--accent, #00f0ff); border: 1px solid var(--accent, #00f0ff);">
+                    [Simulate] Click Gmail Link to Verify
+                </button>
+                <button id="backToLoginBtn" class="btn-secondary" style="background: transparent; color: var(--muted, #94a3b8); border: 1px solid var(--border, #1e293b); padding: 12px; border-radius: 10px; cursor: pointer;">
+                    Return to Login
+                </button>
+            </div>
+            
+            <!-- Professional Footer -->
+            <div class="auth-footer">
+                <div class="footer-divider"></div>
+                <div class="footer-info">
+                    <span>🔒 Local-First Secure Vault</span>
+                    <span class="footer-brand">@building_yourself_</span>
+                </div>
+            </div>
+        </div>
+                    <!-- 4. FORGOT PASSWORD VIEW -->
+        <div id="forgotPasswordView" class="auth-view hidden">
+            <div class="modal-header auth-header">
+                <span class="auth-logo">🔑</span>
+                <h2>Password Recovery</h2>
+            </div>
+            <p class="auth-subtitle">Enter your registered email to receive a secure recovery verification link.</p>
+            
+            <form id="forgotPasswordForm" class="auth-form">
+                <div class="input-group">
+                    <input type="email" id="forgotEmail" placeholder="Registered Email Address" required>
+                </div>
+                <button type="submit" class="btn-primary auth-submit-btn">Send Recovery Link 🚀</button>
+            </form>
+            
+            <p class="auth-switch">Remember your password? <a href="#" id="backToLoginFromForgotBtn">Return to Login</a></p>
+            
+            <!-- Professional Footer -->
+            <div class="auth-footer">
+                <div class="footer-divider"></div>
+                <div class="footer-info">
+                    <span>🔒 Local-First Secure Vault</span>
+                    <span class="footer-brand">@building_yourself</span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+        <!-- MAIN DASHBOARD -->
+<main id="dashboardView" class="view">
+
+        <!-- APP HEADER WITH THEME SWITCHER -->
+        <header class="app-header">
+            <div class="header-top-row">
+                <div>
+                    <h1>🐺 Wolf Workspace</h1>
+                    <p>Your projects. Your mission. Your progress.</p>
+                </div>
+                <div class="header-actions-group">
+                    <button type="button" id="openShortcutsModal" class="shortcuts-trigger-btn" title="Keyboard Shortcuts">
+                        ⌨️ Shortcuts
+                    </button>
+                    <div class="theme-picker-container">
+                        <label for="themeSelect"><span>🎨 Theme</span></label>
+                        <select id="themeSelect">
+                            <option value="wolf-cyber">🐺 Wolf Cyber (Blue)</option>
+                            <option value="emerald-hacker">🐍 Emerald Hacker (Green)</option>
+                            <option value="crimson-alpha">🩸 Crimson Alpha (Red)</option>
+                        </select>
+                    </div>             
+                </div>
+            </div>
+        </header>
+
+      <!-- DASHBOARD HEADER TITLE AREA -->
+  <div class="dashboard-header-block">
+      <h1 id="welcomeUserTitle" class="dashboard-welcome-title">Welcome back, Developer 👋</h1>
+      <p class="dashboard-subtitle">Select a project or create a new one to begin.</p>
+ </div>
+
+        <section class="dashboard-stats">
+            <article class="stat-card">
+                <h3>Total Projects</h3>
+                <p id="totalProjects">0</p>
+            </article>
+
+            <article class="stat-card">
+                <h3>Total Tasks</h3>
+                <p id="totalTasks">0</p>
+            </article>
+
+            <article class="stat-card">
+                <h3>Completed Tasks</h3>
+                <p id="completedTasks">0</p>
+            </article>
+
+            <article class="stat-card">
+                <h3>Overdue Tasks</h3>
+                <p id="overdueTasks">0</p>
+            </article>
+
+            <article class="stat-card">
+                <h3>Upcoming Deadlines</h3>
+                <p id="upcomingTasks">0</p>
+            </article>
+        </section>
+     
+        <section class="create-project-section" style="padding: 20px;">
+            <h2>Create New Project</h2>
+            <form id="projectForm" class="project-form">
+                <div class="form-group">
+                    <label for="projectName">Project Name</label>
+                    <input type="text" id="projectName" placeholder="Enter project name..." maxlength="80" required>
+                </div>
+                <div class="form-group">
+                    <label for="projectDescription">Description (Optional)</label>
+                    <textarea id="projectDescription" placeholder="What is this project about?" maxlength="500" rows="3"></textarea>
+                </div>
+              <div class="form-group">
+                 <label for="projectCategory">Project Category</label>
+                 <select id="projectCategory" required>
+                    <option value="Development" selected>💻 Development</option>
+                    <option value="Business">💼 Business</option>
+                    <option value="Personal">🏠 Personal</option>
+                    <option value="Design">🎨 Design</option>
+                 </select>
+                </div>
+              <div class="form-group">
+    <label for="projectColor">Project Color Accent</label>
+    <select id="projectColor">
+        <option value="#00f0ff" selected>🟦 Cyber Blue</option>
+        <option value="#10b981">🟩 Emerald Green</option>
+        <option value="#ef4444">🟥 Crimson Red</option>
+        <option value="#f59e0b">🟧 Cyber Amber</option>
+        <option value="#a855f7">🟪 Neon Purple</option>
+    </select>
+</div>
+
+<div class="form-group">
+    <label for="projectTags">Project Tags (Comma separated)</label>
+    <input type="text" id="projectTags" placeholder="e.g. backend, API, v1.0">
+</div>
+
+                <button type="submit">+ Create Project</button>
+            </form>
+        </section>
+      <!-- WORKSPACE BACKUP & RESTORE PANEL -->
+        <section class="backup-restore-section">
+            <div class="backup-actions-card">
+                <div>
+                    <h3>🛡️ Workspace Data Backup</h3>
+                    <p>Export or restore your projects, tasks, and notes securely.</p>
+                </div>
+                <div class="backup-buttons">
+                    <button type="button" id="exportBackupBtn" class="secondary-btn">📥 Export Backup</button>
+                    <label for="importBackupInput" class="import-file-label secondary-btn">
+                        📤 Restore Backup
+                    </label>
+                    <input type="file" id="importBackupInput" accept=".json" style="display: none;">
+                </div>
+            </div>
+        </section>
+
+     
+      <!-- GLOBAL SEARCH BAR -->
+        <section class="dashboard-search-section">
+            <input
+                type="search"
+                id="globalSearchInput"
+                placeholder="🔍 Search all projects, descriptions, or tasks..."
+                aria-label="Search all projects and tasks"
+            >
+        </section>
+
+        <section class="projects-section">
+            <h2>My Projects</h2>
+          <div class="project-category-filters">
+              <button type="button" class="category-pill active" data-category="All">All Projects</button>
+              <button type="button" class="category-pill" data-category="Development">💻 Development</button>
+              <button type="button" class="category-pill" data-category="Business">💼 Business</button>
+              <button type="button" class="category-pill" data-category="Personal">🏠 Personal</button>
+              <button type="button" class="category-pill" data-category="Design">🎨 Design</button>
+             </div>
+
+            <div id="projectList" class="project-grid"></div>
+        </section>
+
+    </main>
+  
+    <!-- WOLF EXPORT PAGE -->
+    <section id="exportView" class="view" hidden>
+
+        <header class="export-header">
+            <h1>🐺 WOLF WORKSPACE</h1>
+            <p>Your projects. Your mission. Your progress.</p>
+            <span>━━━━━━━━ NOTES EXPORT ━━━━━━━━</span>
+        </header>
+
+        <article id="exportCard" class="wolf-export-card">
+
+            <div class="export-card-top">
+                <span>🐾 WOLF NOTES</span>
+                <span>SECURE • ORGANIZED</span>
+            </div>
+
+            <h2 id="exportNoteTitle">Note title</h2>
+            <p class="export-tagline">Build. Connect. Grow.</p>
+
+            <div class="export-divider"></div>
+
+            <section class="export-metadata">
+                <div>
+                    <span>📁 CATEGORY</span>
+                    <p id="exportNoteCategory">General</p>
+                </div>
+
+                <div>
+                    <span>🏷️ TAGS</span>
+                    <p id="exportNoteTags">None</p>
+                </div>
+
+                <div>
+                    <span>🕒 LAST UPDATED</span>
+                    <p id="exportNoteDate">Unknown</p>
+                </div>
+            </section>
+
+            <div class="export-divider"></div>
+
+            <section class="export-content-section">
+                <h3>💻 NOTE CONTENT</h3>
+                <p id="exportNoteContent"></p>
+            </section>
+
+            <footer class="export-card-footer">
+                <p>🐺 ORGANIZE • PLAN • ACHIEVE</p>
+                <strong>Built for Bigger Goals.</strong>
+            </footer>
+
+        </article>
+
+        <div class="export-controls">
+            <button id="copyExportNote" type="button">📋 Copy Note</button>
+            <button id="downloadExportPdf" type="button">📄 Export as PDF</button>
+            <button id="closeExportView" type="button">← Back</button>
+        </div>
+
+    </section>
+
+    <!-- INDIVIDUAL PROJECT WORKSPACE -->
+    <main id="projectWorkspace" class="view hidden">
+      
+      <!-- FIXED HEADER STRUCTURE -->
+      <header class="workspace-header">
+        <h1>🐺 Wolf Workspace</h1>
+        <div class="workspace-header-actions">
+          <button id="backToDashboard" type="button">
+            ← Dashboard
+          </button>
+
+          <button
+              id="toggleSidebar"
+              type="button"
+              aria-label="Open navigation menu"
+              aria-expanded="false"
+          >
+              ☰
+          </button>
+        </div>
+      </header>
+
+      <div class="workspace-layout">
+
+        <!-- SIDEBAR OVERLAY -->
+        <div id="sidebarOverlay" class="sidebar-overlay"></div>
+
+        <!-- SIDEBAR NAVIGATION DRAWER -->
+<aside id="projectSidebar" class="project-sidebar">
+    
+    <!-- 1. SIDEBAR HEADER -->
+    <div class="sidebar-header">
+        <div class="sidebar-brand">
+            <span class="brand-icon">🐺</span>
+            <div class="brand-text">
+                <span class="brand-name">Wolf Workspace</span>
+                <span class="brand-tag">Command Center</span>
+            </div>
+        </div>
+        <button type="button" id="closeSidebarBtn" class="sidebar-close-btn" aria-label="Close Sidebar">×</button>
+    </div>
+
+    <div class="sidebar-divider"></div>
+
+    <!-- 2. SIDEBAR MENU ITEMS -->
+    <nav class="sidebar-menu">
+        <span class="sidebar-section-title">NAVIGATION</span>
+
+        <button type="button" class="nav-item active" data-section="tasks">
+            <span class="nav-icon">📋</span>
+            <span class="nav-text">Tasks</span>
+        </button>
+
+        <button type="button" class="nav-item" data-section="notes">
+            <span class="nav-icon">📝</span>
+            <span class="nav-text">Notes</span>
+        </button>
+
+        <button type="button" class="nav-item" data-section="files">
+            <span class="nav-icon">📁</span>
+            <span class="nav-text">Files</span>
+        </button>
+
+        <button type="button" class="nav-item" data-section="settings">
+            <span class="nav-icon">⚙️</span>
+            <span class="nav-text">Settings</span>
+        </button>
+    </nav>
+        <!-- POMODORO FOCUS TIMER WIDGET -->
+    <div class="sidebar-pomodoro-widget" style="padding: 12px; margin: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; text-align: center;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <span style="font-size: 0.75rem; font-weight: 700; color: var(--accent); letter-spacing: 0.5px;">⏱️ FOCUS TIMER</span>
+            <span id="pomoModeBadge" style="font-size: 0.65rem; background: var(--bg); padding: 2px 6px; border-radius: 4px; color: var(--text);">25M FOCUS</span>
+        </div>
+
+        <div id="pomoTimerDisplay" style="font-size: 1.8rem; font-weight: 800; font-family: monospace; color: var(--text); margin: 6px 0; letter-spacing: 2px;">25:00</div>
+
+        <div style="display: flex; justify-content: center; gap: 6px; margin-bottom: 8px;">
+            <button type="button" id="pomoStartBtn" class="restore-btn" style="padding: 4px 10px; font-size: 0.75rem;">▶ Start</button>
+            <button type="button" id="pomoPauseBtn" class="restore-btn hidden" style="padding: 4px 10px; font-size: 0.75rem;">⏸ Pause</button>
+            <button type="button" id="pomoResetBtn" class="file-delete-btn" style="padding: 4px 10px; font-size: 0.75rem;">↺ Reset</button>
+        </div>
+
+        <div style="display: flex; gap: 4px; justify-content: center;">
+            <button type="button" id="pomoFocusModeBtn" class="view-toggle-btn active" style="padding: 2px 8px; font-size: 0.68rem; border-radius: 4px; background: var(--accent); color: #07111f; border: none; font-weight: 600; cursor: pointer;">Focus (25m)</button>
+            <button type="button" id="pomoBreakModeBtn" class="view-toggle-btn" style="padding: 2px 8px; font-size: 0.68rem; border-radius: 4px; background: transparent; color: var(--text); border: none; font-weight: 600; cursor: pointer;">Break (5m)</button>
+        </div>
+    </div>
+
+    <!-- 3. SIDEBAR FOOTER (WORKSPACE STATUS) -->
+    <div class="sidebar-footer">
+        <div class="status-card">
+            <div class="status-indicator">
+                <span class="pulse-dot"></span>
+                <span class="status-label">Local-First System</span>
+            </div>
+            <div class="watermark-tag">@building_yourself_</div>
+        </div>
+    </div>
+
+</aside>
+
+        <!-- PROJECT CONTENT CONTAINER -->
+        <section class="workspace-content">
+
+            <!-- PROJECT DETAILS CARD (Toggled via JS) -->
+            <div class="project-details">
+                <h2 id="workspaceProjectName">Project Name</h2>
+                <p id="workspaceProjectDescription">Project description</p>
+
+                <div class="project-actions">
+                    <button id="editWorkspaceProject" type="button">Edit Project</button>
+                    <button id="deleteWorkspaceProject" type="button">Delete Project</button>
+                </div>
+            </div>
+
+<!-- FILES WORKSPACE VIEW -->
+      <div id="filesSection" class="workspace-tab-view hidden">
+    <section class="workspace-section">
+        <div class="section-header-flex" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;">
+            <h2 style="margin: 0;">📁 Project Files & Attachments</h2>
+            <span id="fileCountBadge" class="file-count-badge">0 Files</span>
+        </div>
+        
+        <!-- File Upload Box -->
+<div id="fileUploadForm" class="file-upload-card">
+    <label for="projectFileInput" class="file-dropzone">
+        <span class="upload-icon">⚡</span>
+        <span class="upload-title">Drop project files here or <span style="color: var(--accent);">browse</span></span>
+        <span class="upload-hint">Supports code, documents, PDFs, and images (Max 2MB)</span>
+    </label>
+    <!-- Make sure "multiple" is right here in the input tag: -->
+    <input type="file" id="projectFileInput" multiple style="display: none;">
+</div>
+        <!-- Files List -->
+        <div id="projectFilesList" class="files-list" style="margin-top: 20px;"></div>
+    </section>
+</div>
+
+          <!--SETTINGS WORKSPACE VIEW-->
+<div id="settingsView" class="workspace-tab-view hidden">
+    <section class="workspace-section">
+        <div class="section-header-flex" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px;">
+            <h2 style="margin: 0;">⚙️ Workspace Settings</h2>
+            <span class="file-count-badge">v1.1 Cyber</span>
+        </div>
+
+        <div class="settings-grid" style="display: grid; gap: 20px;">
+            
+            <!-- STORAGE & DATA MANAGEMENT CARD -->
+            <div class="settings-card">
+                <h3>💾 Storage & Data Management</h3>
+                <p class="settings-desc">Wolf Workspace runs locally via browser storage. Monitor space or clear data.</p>
+                
+                <!-- Storage Meter Bar -->
+                <div class="storage-meter-container" style="margin: 16px 0;">
+                    <div class="storage-meter-labels" style="display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--muted); margin-bottom: 6px;">
+                        <span>LocalStorage Usage</span>
+                        <span id="storageUsageText">0 KB / 5 MB</span>
+                    </div>
+                    <div class="storage-bar-bg" style="background: var(--surface-light); height: 8px; border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
+                        <div id="storageBarFill" style="background: var(--accent); width: 0%; height: 100%; transition: width 0.3s;"></div>
+                    </div>
+                </div>
+
+                <div class="settings-actions" style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px;">
+                    <button type="button" id="settingsExportBtn" class="file-download-btn">📥 Export Backup</button>
+                    <button type="button" id="settingsResetBtn" class="file-delete-btn">⚠️ Factory Reset</button>
+                </div>
+            </div>
+
+            <!-- APPEARANCE & PREFERENCES CARD -->
+            <div class="settings-card">
+                <h3>🎨 Appearance & Themes</h3>
+                <p class="settings-desc">Customize your command-center cyber visual environment.</p>
+                
+                <div style="margin-top: 16px; display: flex; align-items: center; justify-content: space-between;">
+                    <span style="font-size: 0.9rem; font-weight: 600; color: var(--text);">Active Visual Theme</span>
+                    <span style="font-size: 0.85rem; color: var(--accent); font-family: monospace;">Synced with Header</span>
+                </div>
+            </div>
+          <!-- ACCOUNT & PERSONAL DETAILS CARD -->
+<div class="settings-card" style="margin-top: 20px;">
+    <h3>👤 Account & Profile</h3>
+    <p class="settings-desc">Manage your workspace identity and session.</p>
+
+    <!-- LOGGED IN USER STATE (Will dynamically show after Auth module) -->
+    <div id="userProfileBlock" class="user-profile-block" style="margin-top: 16px; padding: 14px; background: var(--bg); border: 1px solid var(--border); border-radius: 12px; display: flex; align-items: center; justify-content: space-between;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <div id="userAvatar" style="width: 42px; height: 42px; border-radius: 50%; background: var(--accent); color: #07111f; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 1.1rem;">
+                W
+            </div>
+            <div>
+                <div id="userNameDisplay" style="font-weight: 700; color: var(--text); font-size: 0.95rem;">Wolf User</div>
+                <div id="userEmailDisplay" style="font-size: 0.8rem; color: var(--muted);">guest@wolfworkspace.local</div>
+            </div>
+        </div>
+
+        <button type="button" id="logoutBtn" class="file-delete-btn" style="padding: 8px 14px; font-size: 0.85rem;">
+            🚪 Log Out
+        </button>
+    </div>
+</div>
+
+            <!-- APP INFORMATION CARD -->
+            <div class="settings-card">
+                <h3>🐺 About Wolf Workspace</h3>
+                <p class="settings-desc">High-performance local-first project management system.</p>
+                
+                <div class="app-info-list" style="margin-top: 16px; display: grid; gap: 8px; font-size: 0.85rem; color: var(--muted);">
+                    <div>Architecture: <strong style="color: var(--text);">Vanilla JS + LocalStorage</strong></div>
+                    <div>Branding & Watermark: <strong style="color: var(--accent);">@building_yourself_</strong></div>
+                    <div>Status: <strong style="color: #4ade80;">Fully Operational</strong></div>
+                </div>
+            </div>
+          <!-- TRASH BIN MANAGEMENT CARD -->
+<div class="settings-card" style="margin-top: 20px;">
+    <h3>🗑️ Trash Bin & Recovery</h3>
+    <p class="settings-desc">Deleted projects are temporarily stored here before permanent removal.</p>
+    
+    <div style="margin-top: 16px; display: flex; align-items: center; justify-content: space-between;">
+        <span id="trashCountText" style="font-size: 0.9rem; font-weight: 600; color: var(--text);">0 items in trash</span>
+        <div style="display: flex; gap: 8px;">
+            <button type="button" id="viewTrashBtn" class="file-download-btn">View Trash</button>   
+        </div>
+    </div>
+</div>
+
+<!-- FEEDBACK & DEVELOPER AREA -->
+<div class="settings-card" style="margin-top: 20px;">
+    <h3>💬 Feedback & Support</h3>
+    <p class="settings-desc">Have a suggestion or found a bug? Send feedback directly to the developer.</p>
+    
+    <form id="feedbackForm" style="margin-top: 16px; display: grid; gap: 12px;">
+        <input type="email" id="feedbackUserEmail" placeholder="Your Email (optional)" style="background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; color: var(--text); font-family: inherit; font-size: 0.9rem;">
+        <textarea id="feedbackInput" rows="3" placeholder="Type your feedback or bug report here..." required style="background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 12px; color: var(--text); font-family: inherit; font-size: 0.9rem; resize: vertical;"></textarea>
+        <button type="submit" id="sendFeedbackBtn" class="file-download-btn" style="justify-self: start; background: var(--accent); color: #07111f; border-color: var(--accent); font-weight: 600;">
+            Send Feedback 🚀
+        </button>
+    </form>
+</div>
+
+        </div>
+    </section>
+</div>
+
+                        <!-- TASK SECTION -->
+            <section id="tasksSection" class="workspace-section">
+                <!-- VIEW SWITCHER TOOLBAR -->
+                <div class="tasks-view-toolbar" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+                    <h2 style="margin: 0;">Project Tasks</h2>
+                    
+                    <div class="view-toggle-group" style="display: flex; gap: 4px; background: var(--surface); padding: 3px; border-radius: 10px; border: 1px solid var(--border);">
+                        <button type="button" id="tasksListViewBtn" class="view-toggle-btn active" style="padding: 6px 14px; font-size: 0.8rem; border-radius: 8px; background: var(--accent); color: #07111f; border: none; font-weight: 700; cursor: pointer;">📋 List View</button>
+                        <button type="button" id="tasksKanbanViewBtn" class="view-toggle-btn" style="padding: 6px 14px; font-size: 0.8rem; border-radius: 8px; background: transparent; color: var(--text); border: none; font-weight: 700; cursor: pointer;">📊 Kanban Board</button>
+                    </div>
+                </div>
+
+                <div class="progress-card">
+                    <div class="progress-information">
+                        <span>Project Progress</span>
+                        <strong id="projectProgressText">0%</strong>
+                    </div>
+
+                    <progress id="projectProgressBar" value="0" max="100">0%</progress>
+                </div>
+
+                <form id="workspaceTaskForm" class="task-form">
+                    <input
+                        type="text"
+                        id="workspaceTaskInput"
+                        placeholder="What needs to be done?"
+                        maxlength="150"
+                        required
+                    >
+
+                    <div class="form-group">
+                        <label for="taskPriority">Priority</label>
+                        <select id="taskPriority" required>
+                            <option value="low">Low</option>
+                            <option value="medium" selected>Medium</option>
+                            <option value="high">High</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="taskDueDate">Deadline (Optional)</label>
+                        <input type="date" id="taskDueDate">
+                    </div>
+
+                    <button type="submit">+ Add Task</button>
+                </form>
+
+                <!-- STANDARD LIST VIEW -->
+                <div id="workspaceTaskList" class="task-list"></div>
+
+                <!-- KANBAN BOARD VIEW (Hidden by default) -->
+                <div id="workspaceKanbanBoard" class="kanban-board hidden" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 20px;">
+                    
+                    <!-- Column 1: To Do -->
+                    <div class="kanban-column" style="background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <h4 style="margin: 0; font-size: 0.85rem; color: var(--accent); font-weight: 700;">⏳ TO DO</h4>
+                            <span id="todoCount" class="file-count-badge" style="font-size: 0.75rem; padding: 2px 8px;">0</span>
+                        </div>
+                        <div id="kanbanTodoColumn" class="kanban-cards-container" style="display: flex; flex-direction: column; gap: 10px; min-height: 220px;"></div>
+                    </div>
+
+                    <!-- Column 2: In Progress -->
+                    <div class="kanban-column" style="background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <h4 style="margin: 0; font-size: 0.85rem; color: #f59e0b; font-weight: 700;">⚡ IN PROGRESS</h4>
+                            <span id="inProgressCount" class="file-count-badge" style="font-size: 0.75rem; padding: 2px 8px;">0</span>
+                        </div>
+                        <div id="kanbanInProgressColumn" class="kanban-cards-container" style="display: flex; flex-direction: column; gap: 10px; min-height: 220px;"></div>
+                    </div>
+
+                    <!-- Column 3: Completed -->
+                    <div class="kanban-column" style="background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <h4 style="margin: 0; font-size: 0.85rem; color: #4ade80; font-weight: 700;">✅ COMPLETED</h4>
+                            <span id="completedCount" class="file-count-badge" style="font-size: 0.75rem; padding: 2px 8px;">0</span>
+                        </div>
+                        <div id="kanbanCompletedColumn" class="kanban-cards-container" style="display: flex; flex-direction: column; gap: 10px; min-height: 220px;"></div>
+                    </div>
+
+                </div>
+            </section>
+
+             
+            <!-- PROJECT NOTES SECTION -->
+            <section id="notesSection" class="workspace-section hidden">
+                <h2>📝 Project Notes</h2>
+                <p>Keep important information organized within this project.</p>
+
+                <form id="noteForm">
+    <input
+        type="text"
+        id="noteTitle"
+        placeholder="Note title..."
+        maxlength="100"
+        required
+    >
+
+    <!-- NOTE CONTENT HEADER WITH WRITE / PREVIEW TABS -->
+    <div class="note-editor-header" style="display: flex; justify-content: space-between; align-items: center; margin: 12px 0 6px 0;">
+        <label for="noteContent" style="margin: 0; font-size: 0.85rem; font-weight: 600; color: var(--text);">Note Content (Markdown Supported)</label>
+        <div class="note-tab-switcher" style="display: flex; gap: 4px; background: var(--bg); padding: 2px; border-radius: 8px; border: 1px solid var(--border);">
+            <button type="button" id="writeTabBtn" class="note-tab-btn active" style="padding: 4px 12px; font-size: 0.75rem; border-radius: 6px; background: var(--accent); color: #07111f; border: none; font-weight: 700; cursor: pointer;">Write</button>
+            <button type="button" id="previewTabBtn" class="note-tab-btn" style="padding: 4px 12px; font-size: 0.75rem; border-radius: 6px; background: transparent; color: var(--text); border: none; font-weight: 700; cursor: pointer;">Preview</button>
+        </div>
+    </div>
+
+    <!-- WRITE TEXTAREA -->
+    <textarea
+        id="noteContent"
+        placeholder="Write your notes here... Use # for headers, **bold**, *italic*, or ```code```"
+        maxlength="10000"
+        required
+        style="resize: vertical;"
+    ></textarea>
+
+    <!-- LIVE PREVIEW PANE (Hidden by default) -->
+    <div id="notePreviewPane" class="note-preview-pane hidden" style="background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 14px; min-height: 120px; max-height: 300px; overflow-y: auto; color: var(--text); font-size: 0.9rem; text-align: left; margin-bottom: 12px;"></div>
+
+    <label for="noteCategory">Category</label>
+    <select id="noteCategory">
+        <option value="General">General</option>
+        <option value="Coding">Coding</option>
+        <option value="Design">Design</option>
+        <option value="Business">Business</option>
+    </select>
+
+    <label for="noteTags">Tags</label>
+    <input type="text" id="noteTags" placeholder="Enter tags separated by commas">
+
+    <button type="submit">Save Note</button>
+</form>
+
+                <!-- SEARCH & FILTER TOOLBAR -->
+                <div class="notes-toolbar">
+                    <div class="filter-group search-group">
+                        <input
+                            type="search"
+                            id="noteSearch"
+                            placeholder="🔍 Search notes by title or content..."
+                            aria-label="Search notes by title or content"
+                        >
+                    </div>
+
+                    <div class="filter-group">
+                        <label for="noteCategoryFilter">Filter by category</label>
+                        <select id="noteCategoryFilter">
+                            <option value="All">All Categories</option>
+                            <option value="General">General</option>
+                            <option value="Coding">Coding</option>
+                            <option value="Design">Design</option>
+                            <option value="Business">Business</option>
+                        </select>
+                    </div>
+
+                    <div class="filter-group">
+                        <label for="noteTagFilter">Filter by tag</label>
+                        <select id="noteTagFilter">
+                            <option value="All">All Tags</option>
+                        </select>
+                    </div>
+
+                    <div class="filter-group">
+                        <label for="noteSort">Sort notes</label>
+                        <select id="noteSort">
+                            <option value="newest">Newest updated</option>
+                            <option value="oldest">Oldest updated</option>
+                            <option value="title">Title A–Z</option>
+                        </select>
+                    </div>
+
+                    <div class="filter-actions">
+                        <button type="button" id="resetNoteFilters" class="secondary-btn">Reset Filters</button>
+                        <p id="noteCount" class="note-count-badge">0 notes</p>
+                    </div>
+                </div>
+                      
+                <div id="notesList" class="notes-list">
+                    <p class="empty-state">No notes yet. Create your first note!</p>
+                </div>
+            </section>
+
+        </section> <!-- End workspace-content -->
+
+      </div> <!-- End workspace-layout -->
+
+    </main>
+
+    <!-- EDIT PROJECT MODAL -->
+    <div id="editProjectModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Edit Project</h2>
+                <button id="closeEditModal" type="button" aria-label="Close">×</button>
+            </div>
+
+            <form id="editProjectForm">
+                <label for="editProjectName">Project Name</label>
+                <input type="text" id="editProjectName" maxlength="80" required>
+
+                <label for="editProjectDescription">Project Description</label>
+                <textarea id="editProjectDescription" maxlength="500" rows="5"></textarea>
+                <label for="editProjectCategory">Project Category</label>
+                <select id="editProjectCategory" required>
+                <option value="Development">💻 Development</option>
+                <option value="Business">💼 Business</option>
+                <option value="Personal">🏠 Personal</option>
+                <option value="Design">🎨 Design</option>
+            </select>
+                <label for="editProjectColor">Project Color Accent</label>
+                <select id="editProjectColor">
+                <option value="#00f0ff">🟦 Cyber Blue</option>
+                <option value="#10b981">🟩 Emerald Green</option>
+                <option value="#ef4444">🟥 Crimson Red</option>
+                <option value="#f59e0b">🟧 Cyber Amber</option>
+                <option value="#a855f7">🟪 Neon Purple</option>
+             </select>
+
+               <label for="editProjectTags">Project Tags</label>
+               <input type="text" id="editProjectTags" placeholder="e.g. backend, API, v1.0">
+
+                <div class="modal-actions">
+                    <button type="button" id="cancelEditProject">Cancel</button>
+                    <button type="submit" id="saveEditProject">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- KEYBOARD SHORTCUTS MODAL -->
+  <div id="shortcutsModal" class="modal hidden">
+      <div class="modal-content">
+          <div class="modal-header">
+              <h2>⌨️ Keyboard Shortcuts</h2>
+              <button id="closeShortcutsModal" type="button" aria-label="Close">×</button>
+          </div>
+
+                    <div class="shortcuts-list">
+              <div class="shortcut-item">
+                  <span>Open Command Palette</span>
+                  <kbd>Ctrl + Shift + P</kbd>
+              </div>
+              <div class="shortcut-item">
+                  <span>Quick Capture Task/Note</span>
+                  <kbd>Shift + N</kbd>
+              </div>
+              <div class="shortcut-item">
+                  <span>Focus Global Search</span>
+                  <kbd>/</kbd> or <kbd>Ctrl + K</kbd>
+              </div>
+              <div class="shortcut-item">
+                  <span>Focus New Project Input</span>
+                  <kbd>N</kbd>
+              </div>
+              <div class="shortcut-item">
+                  <span>Close Modals / Sidebar</span>
+                  <kbd>Esc</kbd>
+              </div>
+          </div>
+          </div>
+
+          <div class="modal-actions" style="margin-top: 24px;">
+              <button type="button" id="closeShortcutsBtn" class="secondary-btn" style="width: 100%;">Got it</button>
+          </div>
+      </div>
+  </div>
+  <!-- CUSTOM REUSABLE CONFIRMATION MODAL -->
+<div id="confirmModal" class="modal hidden">
+    <div class="modal-content confirm-modal-content">
+        <div class="modal-header">
+            <h2 id="confirmModalTitle">⚠️ Confirmation</h2>
+            <button id="closeConfirmModal" type="button" aria-label="Close">×</button>
+        </div>
+        <div class="modal-body">
+            <p id="confirmModalMessage" class="confirm-message">Are you sure you want to proceed?</p>
+        </div>
+        <div class="modal-actions">
+            <button type="button" id="cancelConfirmBtn" class="secondary-btn">Cancel</button>
+            <button type="button" id="actionConfirmBtn" class="danger-btn">Confirm</button>
+        </div>
+    </div>
+</div>
+
+<!-- FILE PREVIEW MODAL -->
+<div id="filePreviewModal" class="modal hidden">
+    <div class="modal-content file-preview-modal-content">
+        <div class="modal-header">
+            <h2 id="previewModalTitle">📁 File Preview</h2>
+            <button id="closePreviewModal" type="button" aria-label="Close">×</button>
+        </div>
+        <div class="modal-body file-preview-body" id="filePreviewBody">
+            <!-- Dynamic content injected here (Image, Text, or Iframe) -->
+        </div>
+        <div class="modal-actions" style="justify-content: space-between;">
+            <span id="previewFileMeta" style="color: var(--muted); font-size: 0.8rem; font-family: monospace;"></span>
+            <button type="button" id="previewDownloadBtn" class="file-download-btn">📥 Download File</button>
+        </div>
+    </div>
+</div>
+
+  <!-- TRASH BIN RECOVERY MODAL -->
+<div id="trashModal" class="modal hidden">
+    <div class="modal-content" style="max-width: 600px; max-height: 80vh; display: flex; flex-direction: column;">
+        <div class="modal-header" style="align-items: center;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <h2 style="margin: 0;">🗑️ Trash Bin</h2>
+                <button type="button" id="modalEmptyTrashBtn" class="file-delete-btn" style="padding: 4px 10px; font-size: 0.75rem;">Empty All</button>
+            </div>
+            <button id="closeTrashModal" type="button" aria-label="Close">×</button>
+        </div>
+
+        <div class="modal-body" style="overflow-y: auto; flex: 1; padding: 16px 0;">
+            <div id="trashItemsList" class="trash-items-list" style="display: flex; flex-direction: column; gap: 12px;">
+                <!-- Trash items render dynamically here -->
+            </div>
+        </div>
+
+        <div class="modal-actions" style="justify-content: flex-end; border-top: 1px solid var(--border); padding-top: 16px;">
+            <button type="button" id="closeTrashBtn" class="secondary-btn" style="width: 100%;">Close</button>
+        </div>
+    </div>
+</div>
+
+    <!-- EDIT TASK MODAL -->
+    <div id="editTaskModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Edit Task</h2>
+                <button id="closeEditTaskModal" type="button" aria-label="Close">×</button>
+            </div>
+
+            <form id="editTaskForm">
+                <div class="form-group">
+                    <label for="editTaskText">Task Description</label>
+                    <textarea id="editTaskText" maxlength="150" rows="4" placeholder="Enter task description..." required></textarea>
+                    <small>Maximum 150 characters.</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="editTaskPriority">Priority</label>
+                    <select id="editTaskPriority" required>
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="editTaskDueDate">Deadline (Optional)</label>
+                    <input type="date" id="editTaskDueDate">
+                </div>
+
+                <div class="modal-actions">
+                    <button id="cancelEditTask" type="button">Cancel</button>
+                    <button type="submit">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- DELETE TASK MODAL -->
+    <div id="deleteTaskModal" class="modal hidden">
+        <div class="modal-content delete-modal-content">
+            <div class="modal-header">
+                <h2>Delete Task?</h2>
+                <button id="closeDeleteTaskModal" type="button" aria-label="Close">×</button>
+            </div>
+
+            <div class="delete-warning">
+                <span class="warning-icon">⚠️</span>
+                <p>You're about to delete:</p>
+                <p><strong id="deleteTaskName"></strong></p>
+                <p>This action cannot be undone.</p>
+            </div>
+
+            <div class="modal-actions">
+                <button id="cancelDeleteTask" type="button">Cancel</button>
+                <button id="confirmDeleteTask" type="button">Delete Task</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- DELETE NOTE MODAL -->
+    <div id="deleteNoteModal" class="modal hidden">
+        <div class="modal-content">
+            <h2>Delete Note?</h2>
+            <p>Are you sure you want to delete <strong id="deleteNoteTitle"></strong>?</p>
+            <p>This action cannot be undone.</p>
+
+            <div class="modal-actions">
+                <button type="button" id="cancelDeleteNote">Cancel</button>
+                <button type="button" id="confirmDeleteNote">Delete Note</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- DELETE PROJECT MODAL -->
+    <div id="deleteProjectModal" class="modal hidden">
+        <div class="modal-content delete-modal-content">
+            <div class="modal-header">
+                <h2>Delete Project?</h2>
+                <button id="closeDeleteModal" type="button" aria-label="Close">×</button>
+            </div>
+
+            <div class="delete-warning">
+                <span class="warning-icon">⚠️</span>
+                <p>You're about to delete: <strong id="deleteProjectName">this project</strong>.</p>
+                <p>All tasks belonging to this project will also be deleted. This action cannot be undone.</p>
+            </div>
+
+            <div class="modal-actions">
+                <button id="cancelDeleteProject" type="button">Cancel</button>
+                <button id="confirmDeleteProject" type="button">Delete Project</button>
+            </div>
+        </div>
+    </div>
+  
+  <!-- FLOATING QUICK-CAPTURE BUTTON (FAB) -->
+<button type="button" id="quickCaptureFab" class="quick-capture-fab" title="Quick Capture (Shift + N)" aria-label="Quick Capture">
+    ⚡
+</button>
+
+<!-- QUICK CAPTURE MODAL -->
+<div id="quickCaptureModal" class="modal hidden">
+    <div class="modal-content" style="max-width: 480px;">
+        <div class="modal-header">
+            <h2>⚡ Quick Capture</h2>
+            <!-- Updated ID and explicit click handler hook -->
+            <button type="button" id="closeQuickCaptureModal" class="close-modal-btn" onclick="closeQuickCapture()">×</button>
+        </div>
+        
+        <form id="quickCaptureForm">
+            <div class="form-group">
+                <label for="quickCaptureType">Capture Type</label>
+                <select id="quickCaptureType">
+                    <option value="task" selected>📋 Quick Task</option>
+                    <option value="note">📝 Quick Note</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="quickCaptureTargetProject">Target Project</label>
+                <select id="quickCaptureTargetProject" required></select>
+            </div>
+
+            <div class="form-group">
+                <label for="quickCaptureTitle">Title / Text</label>
+                <input type="text" id="quickCaptureTitle" placeholder="What's on your mind?" maxlength="150" required>
+            </div>
+
+            <div id="quickCaptureNoteBodyGroup" class="form-group hidden">
+                <label for="quickCaptureBody">Note Details (Optional)</label>
+                <textarea id="quickCaptureBody" rows="3" placeholder="Add extra details..." maxlength="2000"></textarea>
+            </div>
+
+            <div class="modal-actions">
+                <button type="button" id="cancelQuickCapture" class="secondary-btn">Cancel</button>
+                <button type="submit" class="auth-submit-btn">Save Entry 🚀</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- GLOBAL COMMAND PALETTE MODAL -->
+<div id="commandPaletteModal" class="modal hidden">
+    <div class="modal-content command-palette-content" style="max-width: 600px; padding: 16px;">
+        <div style="display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--border); padding-bottom: 12px; margin-bottom: 12px;">
+            <span style="font-size: 1.2rem;">⚡</span>
+            <input type="search" id="cmdInput" placeholder="Type a command or search actions..." style="width: 100%; background: transparent; border: none; outline: none; color: var(--text); font-size: 1rem; font-family: inherit;">
+            <span style="font-size: 0.75rem; color: var(--muted); background: var(--surface); padding: 2px 6px; border-radius: 4px;">ESC</span>
+        </div>
+
+        <div id="cmdResultsList" style="display: flex; flex-direction: column; gap: 6px; max-height: 320px; overflow-y: auto;">
+            <!-- Commands render dynamically -->
+        </div>
+    </div>
+</div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="app.js"></script>
+
+</body>
+</html>
+
