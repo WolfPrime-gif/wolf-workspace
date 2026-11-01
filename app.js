@@ -494,21 +494,36 @@ projects.push(project);
 });
 
 // ========================================
-// NAVIGATION & VIEW SWITCHERS
+// 🐺 SAFE DASHBOARD & WORKSPACE NAVIGATION
 // ========================================
 
 function showDashboard() {
     activeProjectId = null;
-    projectWorkspace.classList.add("hidden");  
-    dashboardView.classList.remove("hidden");  
-    renderDashboard();  
+    
+    const projectWorkspace = document.getElementById('projectWorkspace');
+    const dashboardView = document.getElementById('dashboardView');
+
+    if (projectWorkspace) projectWorkspace.classList.add("hidden");  
+    if (dashboardView) dashboardView.classList.remove("hidden");  
+    
+    if (typeof renderDashboard === 'function') {
+        renderDashboard();  
+    }
+    
     window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 function openProject(projectId) {
     activeProjectId = projectId;
     const project = getActiveProject();
-    if (!project) return;
+    if (!project) {
+        console.warn("⚠️ Project not found for ID:", projectId);
+        showDashboard();
+        return;
+    }
+
+    const dashboardView = document.getElementById('dashboardView');
+    const projectWorkspace = document.getElementById('projectWorkspace');
 
     if (dashboardView) dashboardView.classList.add("hidden");
     if (projectWorkspace) projectWorkspace.classList.remove("hidden");
@@ -518,10 +533,10 @@ function openProject(projectId) {
 }
 
 function resetWorkspaceToTasks() {
-    const tasksSection = $("#tasksSection");
-    const notesSection = $("#notesSection");
-    const filesSection = $("#filesSection");
-    const settingsSection = $("#settingsView");
+    const tasksSection = document.getElementById("tasksSection") || document.querySelector("#tasksSection");
+    const notesSection = document.getElementById("notesSection");
+    const filesSection = document.getElementById("filesSection");
+    const settingsSection = document.getElementById("settingsView");
     const projectDetailsBlock = document.querySelector(".project-details");
 
     if (tasksSection) tasksSection.classList.add("hidden");
@@ -539,7 +554,15 @@ function resetWorkspaceToTasks() {
     window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
-backToDashboard.addEventListener("click", showDashboard);
+// Safely wired event listener with guard
+if (typeof backToDashboard !== 'undefined' && backToDashboard) {
+    backToDashboard.addEventListener("click", showDashboard);
+} else {
+    document.addEventListener("DOMContentLoaded", () => {
+        const backBtn = document.getElementById("backToDashboard");
+        if (backBtn) backBtn.addEventListener("click", showDashboard);
+    });
+}
 
 function renderWorkspace() {
     const project = getActiveProject();
@@ -548,29 +571,40 @@ function renderWorkspace() {
         return;  
     }  
 
-    workspaceProjectName.textContent = project.name;  
-    workspaceProjectDescription.textContent = project.description || "No description provided.";  
+    // Safely assign text content with fallbacks
+    const wsName = document.getElementById("workspaceProjectName");
+    const wsDesc = document.getElementById("workspaceProjectDescription");
+    const noteTagFilter = document.getElementById("noteTagFilter");
 
-    const allTags = [...new Set(project.notes.flatMap(note => Array.isArray(note.tags) ? note.tags : []))].sort((a, b) => a.localeCompare(b));
-    const previousTag = noteTagFilter.value;
+    if (wsName) wsName.textContent = project.name || "Untitled Project";  
+    if (wsDesc) wsDesc.textContent = project.description || "No description provided.";  
 
-    noteTagFilter.replaceChildren();
-    const allOption = createElement("option", "", "All Tags");
-    allOption.value = "All";
-    noteTagFilter.appendChild(allOption);
+    // Safely handle notes array even if undefined
+    const notesArray = Array.isArray(project.notes) ? project.notes : [];
+    const allTags = [...new Set(notesArray.flatMap(note => Array.isArray(note.tags) ? note.tags : []))].sort((a, b) => a.localeCompare(b));
+    
+    if (noteTagFilter) {
+        const previousTag = noteTagFilter.value;
+        noteTagFilter.replaceChildren();
+        
+        const allOption = createElement("option", "", "All Tags");
+        allOption.value = "All";
+        noteTagFilter.appendChild(allOption);
 
-    allTags.forEach(tag => {
-        const option = createElement("option", "", tag);
-        option.value = tag;
-        noteTagFilter.appendChild(option);
-    });
+        allTags.forEach(tag => {
+            const option = createElement("option", "", tag);
+            option.value = tag;
+            noteTagFilter.appendChild(option);
+        });
 
-    noteTagFilter.value = allTags.includes(previousTag) ? previousTag : "All";
+        noteTagFilter.value = allTags.includes(previousTag) ? previousTag : "All";
+    }
 
-    renderTasks();  
-    renderNotes();  
-    updateProjectProgress();
+    if (typeof renderTasks === 'function') renderTasks();  
+    if (typeof renderNotes === 'function') renderNotes();  
+    if (typeof updateProjectProgress === 'function') updateProjectProgress();
 }
+
 
 // ========================================
 // EDIT & DELETE PROJECT MODALS
@@ -1426,9 +1460,8 @@ if (closeExportBtn) {
         window.scrollTo(0, 0);
     });
 }
-
 // ========================================
-// PROJECT FILES & MULTI-UPLOAD SYSTEM
+// PROJECT FILES & MULTI-UPLOAD SYSTEM (WITH DUPLICATE CHECKER)
 // ========================================
 
 const projectFileInput = $("#projectFileInput");
@@ -1445,12 +1478,24 @@ if (projectFileInput) {
         if (!project.files) project.files = [];
 
         let addedCount = 0;
+        let duplicateCount = 0;
 
         // Loop through all selected files
         Array.from(files).forEach((file) => {
             // Optional: Limit individual file size to 2MB
             if (file.size > 2 * 1024 * 1024) {
                 showToast(`⚠️ "${file.name}" is too large (Max 2MB).`, false);
+                return;
+            }
+
+            // 🐺 CHECK FOR DUPLICATE FILENAME IN THE SAME PROJECT
+            const isDuplicate = project.files.some(existingFile => 
+                existingFile.name.toLowerCase() === file.name.toLowerCase()
+            );
+
+            if (isDuplicate) {
+                duplicateCount++;
+                console.warn(`⚠️ Duplicate file skipped: "${file.name}" already exists in this project.`);
                 return;
             }
 
@@ -1474,6 +1519,11 @@ if (projectFileInput) {
         });
 
         projectFileInput.value = "";
+
+        // Notify user about results
+        if (duplicateCount > 0) {
+            showToast(`⚠️ Skipped ${duplicateCount} duplicate file(s).`, false);
+        }
         if (addedCount > 0) {
             showToast(`📎 Successfully attached ${addedCount} file(s)!`);
         }
@@ -1526,7 +1576,7 @@ function renderFiles() {
             link.click();
             document.body.removeChild(link);
         });
-
+        
                 const deleteBtn = createButton("Delete", "file-delete-btn", async () => {
             const confirmed = await showCustomConfirm("🗑️ Delete File", `Are you sure you want to delete "${file.name}"?`);
             if (confirmed) {
@@ -1781,79 +1831,137 @@ if (checkVerifyBtn) {
     });
 }
 
-// 4. Login Form Handler
+// ========================================
+// 🐺 LOGIN FORM HANDLER WITH LOADING STATE
+// ========================================
+
 if (loginForm) {
     loginForm.addEventListener('submit', async (e) => {
         e.preventDefault();
+
         const email = document.getElementById('loginEmail')?.value;
         const password = document.getElementById('loginPassword')?.value;
 
+        // Find the submit button
+        const submitBtn =
+            loginForm.querySelector('button[type="submit"]') ||
+            loginForm.querySelector('.btn-primary');
+
+        let originalButtonText = "Initialize Session";
+        let loginSuccessful = false;
+
+        if (submitBtn) {
+            originalButtonText = submitBtn.innerHTML;
+
+            submitBtn.disabled = true;
+            submitBtn.style.opacity = "0.7";
+            submitBtn.style.cursor = "not-allowed";
+            submitBtn.innerHTML = "⏳ Authenticating...";
+        }
+
         try {
-            const userCredential = await auth.signInWithEmailAndPassword(email, password);
-            
-            if (!userCredential.user.emailVerified) {
-                alert('Please check your email and click the verification link before logging in.');
+            // 1. Authenticate with Firebase
+            const userCredential = await auth.signInWithEmailAndPassword(
+                email,
+                password
+            );
+
+            const user = userCredential.user;
+
+            // 2. Check email verification
+            if (!user.emailVerified) {
+                alert(
+                    'Please check your email and click the verification link before logging in.'
+                );
+
                 await auth.signOut();
                 return;
             }
 
-            // Save user session & trigger live UI render instantly
-            handleLogin(userCredential.user.email);
+            // 3. Success feedback
+            if (submitBtn) {
+                submitBtn.innerHTML = "🐺 Welcome back!";
+            }
+
+            // 4. Save user session and trigger live UI rendering
+            await handleLogin(user.email);
+
+            loginSuccessful = true;
 
         } catch (err) {
             console.error('Firebase Login Error:', err);
+
             alert('Login Failed: ' + err.message);
-        }
-    });
-}
-   
-// 5. Standalone Logout Function
-function handleLogout() {
-    // Clear local storage sessions and cached user data
-    localStorage.removeItem('wolf_current_user');
-    
-    // Clear global state array if declared globally
-    if (typeof currentProjects !== 'undefined') {
-        currentProjects = [];
-    }
 
-    // Toggle views if DOM elements exist
-    const appContainer = document.getElementById('app-container');
-    const authContainer = document.getElementById('auth-container');
-    
-    if (appContainer) appContainer.style.display = 'none';
-    if (authContainer) authContainer.style.display = 'block';
-
-    // Clear DOM lists / re-evaluate UI
-    if (typeof renderWorkspace === 'function') {
-        renderWorkspace();
-    }
-}
-
-// 5. Explicit Event Listener
-const logoutBtn = document.getElementById("logoutBtn");
-if (logoutBtn) {
-    logoutBtn.addEventListener("click", async () => {
-        const confirmed = typeof showCustomConfirm === 'function'
-            ? await showCustomConfirm("🐺 Wolf Security", "Are you sure you want to terminate session?")
-            : confirm("Are you sure you want to log out?");
-
-        if (confirmed) {
-            try {
-                // Sign out Firebase/Auth if active
-                if (typeof auth !== 'undefined' && auth.signOut) {
-                    await auth.signOut();
-                }
-            } catch (err) {
-                console.error("Logout error:", err);
-            } finally {
-                // Always clean local storage & refresh to reset full state
-                handleLogout();
-                window.location.reload();
+        } finally {
+            // 5. Restore button if login was unsuccessful
+            if (!loginSuccessful && submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.style.opacity = "1";
+                submitBtn.style.cursor = "pointer";
+                submitBtn.innerHTML = originalButtonText;
             }
         }
     });
 }
+// ========================================
+// 🐺 ROBUST LOGOUT HANDLER (NO BLANK PAGES)
+// ========================================
+
+async function handleLogout() {
+    try {
+        console.log("🐺 Terminating session...");
+
+        // 1. Flag explicitly in session storage that a manual logout occurred
+        sessionStorage.setItem('wolf_logged_out', 'true');
+        localStorage.removeItem('wolf_current_user');
+        localStorage.removeItem('firebase:authUser');
+
+        if (typeof projects !== 'undefined') projects = [];
+        if (typeof activeProjectId !== 'undefined') activeProjectId = null;
+
+        // 2. Sign out from Firebase Auth if available
+        if (typeof auth !== 'undefined' && typeof auth.signOut === 'function') {
+            await auth.signOut();
+        }
+    } catch (err) {
+        console.error("❌ Firebase signout error:", err);
+    } finally {
+        console.log("🐺 Session cleared. Reloading interface...");
+        
+        // 3. Clean reload
+        setTimeout(() => {
+            window.location.reload();
+        }, 150);
+    }
+}
+
+// ========================================
+// 🐺 ROBUST GLOBAL LOGOUT DELEGATION
+// ========================================
+
+document.addEventListener("click", async (e) => {
+    // Check if the clicked element (or any parent of it) is the logout button
+    const logoutBtn = e.target.closest("#logoutBtn");
+    
+    if (!logoutBtn) return; // If it's not the logout button, ignore
+
+    e.preventDefault();
+    console.log("🐺 Logout button clicked!");
+
+    const confirmed = typeof showCustomConfirm === 'function'
+        ? await showCustomConfirm("🐺 Security", "Are you sure you want to log out?")
+        : confirm("Are you sure you want to log out?");
+
+    if (confirmed) {
+        if (typeof handleLogout === 'function') {
+            await handleLogout();
+        } else {
+            console.error("❌ handleLogout function is not defined!");
+        }
+    }
+});
+
 
 });
 // Helper: Add Password Show/Hide Toggles
@@ -1885,50 +1993,79 @@ function setupPasswordToggles() {
         input.parentNode.appendChild(toggleBtn);
     });
 }
-// Helper: Sync User Profile and Show Dashboard
+// Helper: Sync User Profile and Show Dashboard (Fully Diagnostic)
 function syncProfileAndHideModal(user) {
-    const authModal = document.getElementById('authModal');
-    const dashboardView = document.getElementById('dashboardView');
-    const projectWorkspace = document.getElementById('projectWorkspace');
+    try {
+        console.log("🐺 syncProfileAndHideModal triggered with user:", user ? user.email : "null");
 
-    // Hide authentication modal
-    if (authModal) {
-        authModal.classList.add('hidden');
+        if (!user) {
+            console.warn("⚠️ syncProfileAndHideModal called with null user. Forcing login view.");
+            const authModal = document.getElementById('authModal');
+            const dashboardView = document.getElementById('dashboardView');
+            if (dashboardView) dashboardView.classList.add('hidden');
+            if (authModal) {
+                authModal.classList.remove('hidden');
+                authModal.style.display = 'block';
+            }
+            return;
+        }
+
+        const authModal = document.getElementById('authModal');
+        const dashboardView = document.getElementById('dashboardView');
+        const projectWorkspace = document.getElementById('projectWorkspace');
+
+        console.log("🐺 DOM Elements check -> authModal:", !!authModal, "| dashboardView:", !!dashboardView, "| projectWorkspace:", !!projectWorkspace);
+
+        // Hide authentication modal safely
+        if (authModal) {
+            authModal.classList.add('hidden');
+            authModal.style.display = 'none'; // Ensure it's forcefully hidden
+        } else {
+            console.error("❌ Critical: 'authModal' element not found in DOM!");
+        }
+
+        // Hide project workspace safely
+        if (projectWorkspace) {
+            projectWorkspace.classList.add('hidden');
+        }
+
+        // Reveal dashboard safely
+        if (dashboardView) {
+            dashboardView.classList.remove('hidden');
+            dashboardView.style.display = 'block'; // Ensure it's forcefully visible
+        } else {
+            console.error("❌ Critical: 'dashboardView' element not found in DOM!");
+        }
+
+        // Safe extraction of user display info
+        const userEmail = user.email || "user@wolf.local";
+        const displayName = user.displayName || userEmail.split('@')[0] || "Wolf User";
+
+        // Update user profile elements safely
+        const userNameEl = document.getElementById('userNameDisplay');
+        const userEmailEl = document.getElementById('userEmailDisplay');
+        const userAvatarEl = document.getElementById('userAvatar');
+
+        if (userNameEl) userNameEl.textContent = displayName;
+        if (userEmailEl) userEmailEl.textContent = userEmail;
+        if (userAvatarEl) userAvatarEl.textContent = userEmail.charAt(0).toUpperCase();
+
+        // Render dashboard safely wrapped in its own try/catch so it can't blank the page
+        try {
+            if (typeof renderDashboard === 'function') {
+                renderDashboard();
+                console.log("🐺 renderDashboard() executed successfully.");
+            } else {
+                console.warn("⚠️ renderDashboard is not a defined function.");
+            }
+        } catch (renderErr) {
+            console.error("❌ Error inside renderDashboard():", renderErr);
+        }
+
+        console.log("🐺 Dashboard successfully activated.");
+    } catch (err) {
+        console.error("❌ Fatal Error inside syncProfileAndHideModal:", err);
     }
-
-    // Hide project workspace
-    if (projectWorkspace) {
-        projectWorkspace.classList.add('hidden');
-    }
-
-    // Reveal dashboard
-    if (dashboardView) {
-        dashboardView.classList.remove('hidden');
-    }
-
-    // Update user profile
-    const userNameEl = document.getElementById('userNameDisplay');
-    const userEmailEl = document.getElementById('userEmailDisplay');
-    const userAvatarEl = document.getElementById('userAvatar');
-
-    if (userNameEl) {
-        userNameEl.textContent = user.displayName || user.email.split('@')[0];
-    }
-
-    if (userEmailEl) {
-        userEmailEl.textContent = user.email;
-    }
-
-    if (userAvatarEl) {
-        userAvatarEl.textContent = user.email.charAt(0).toUpperCase();
-    }
-
-    // Render dashboard
-    if (typeof renderDashboard === 'function') {
-        renderDashboard();
-    }
-
-    console.log("🐺 Dashboard successfully activated.");
 }
       
 function renderSettings() {
@@ -1966,20 +2103,47 @@ if (settingsExportBtn) {
         if (exportBtn) exportBtn.click();
     });
 }
+// ========================================
+// 🐺 USER-SCOPED FACTORY RESET BUTTON LISTENER
+// ========================================
 
 const settingsResetBtn = document.getElementById("settingsResetBtn");
 if (settingsResetBtn) {
     settingsResetBtn.addEventListener("click", async () => {
         const confirmed = typeof showCustomConfirm === 'function'
-            ? await showCustomConfirm("⚠️ Factory Reset", "This will permanently delete all local projects and reset settings. Proceed?")
-            : confirm("This will permanently delete all local projects and reset settings. Proceed?");
+            ? await showCustomConfirm("⚠️ Factory Reset", "This will permanently delete all local projects and reset settings for YOUR account only. Proceed?")
+            : confirm("This will permanently delete all local projects and reset settings for YOUR account only. Proceed?");
             
         if (confirmed) {
-            localStorage.clear();
-            window.location.reload();
+            try {
+                // Target ONLY the current user's specific storage keys using your helper
+                const projectStorageKey = getUserStorageKey('projects');
+                
+                // Remove only this user's data (instead of localStorage.clear() which nukes everyone)
+                localStorage.removeItem(projectStorageKey);
+                
+                // Keep session logout state clean if needed, or clear user profile cache for this account
+                localStorage.removeItem('wolf_current_user');
+                
+                // Reset active memory variables safely
+                if (typeof projects !== 'undefined') projects = [];
+                if (typeof activeProjectId !== 'undefined') activeProjectId = null;
+
+                console.log("🐺 Scoped factory reset completed successfully.");
+                
+                if (typeof showToast === 'function') {
+                    showToast("Factory reset successful.", "success");
+                }
+            } catch (err) {
+                console.error("❌ Factory reset error:", err);
+            } finally {
+                window.location.reload();
+            }
         }
     });
+    console.log("🐺 settingsResetBtn event listener attached.");
 }
+
 // Helper: Update Auth UI based on user session status
 function updateAuthUI(user) {
     if (user && user.emailVerified) {
@@ -2176,60 +2340,82 @@ if (e.target === shortcutsModal) closeShortcuts();
 // REFINED WORKSPACE BACKUP & RESTORE SYSTEM
 // ========================================
 
-const exportBackupBtn = $("#exportBackupBtn");
 const importBackupInput = $("#importBackupInput");
 
-// 1. EXPORT REFINED BACKUP AS JSON FILE
+// ========================================
+// 🐺 ROBUST USER-SCOPED EXPORT HANDLER
+// ========================================
+
+const exportBackupBtn = document.getElementById("exportBackupBtn");
+
 if (exportBackupBtn) {
-exportBackupBtn.addEventListener("click", () => {
-try {
-// Calculate total tasks and notes across all projects for summary stats
-let totalTasksCount = 0;
-let totalNotesCount = 0;
+    exportBackupBtn.addEventListener("click", () => {
+        try {
+            // 1. Fetch data strictly from the active user's scoped storage key
+            const projectStorageKey = typeof getUserStorageKey === 'function' 
+                ? getUserStorageKey('projects') 
+                : 'projects';
+            
+            const rawData = localStorage.getItem(projectStorageKey);
+            const userProjects = rawData ? JSON.parse(rawData) : (typeof projects !== 'undefined' ? projects : []);
 
-projects.forEach(project => {  
-            if (project.tasks) totalTasksCount += project.tasks.length;  
-            if (project.notes) totalNotesCount += project.notes.length;  
-        });  
+            // Calculate total tasks and notes across all user projects for summary stats
+            let totalTasksCount = 0;
+            let totalNotesCount = 0;
 
-        const dataToExport = {  
-            app: "Wolf Workspace",  
-            version: "1.1",  
-            exportDate: new Date().toLocaleDateString("en-US", {  
-                year: "numeric",  
-                month: "long",  
-                day: "numeric",  
-                hour: "2-digit",  
-                minute: "2-digit"  
-            }),  
-            summary: {  
-                totalProjects: projects.length,  
-                totalTasks: totalTasksCount,  
-                totalNotes: totalNotesCount  
-            },  
-            projects: projects  
-        };  
+            userProjects.forEach(project => {  
+                if (Array.isArray(project.tasks)) totalTasksCount += project.tasks.length;  
+                if (Array.isArray(project.notes)) totalNotesCount += project.notes.length;  
+            });  
 
-        const jsonString = JSON.stringify(dataToExport, null, 2);  
-        const blob = new Blob([jsonString], { type: "application/json" });  
-        const url = URL.createObjectURL(blob);  
+            const dataToExport = {  
+                app: "Wolf Workspace",  
+                version: "1.1",
+                userKey: projectStorageKey,
+                exportDate: new Date().toLocaleDateString("en-US", {  
+                    year: "numeric",  
+                    month: "long",  
+                    day: "numeric",  
+                    hour: "2-digit",  
+                    minute: "2-digit"  
+                }),  
+                summary: {  
+                    totalProjects: userProjects.length,  
+                    totalTasks: totalTasksCount,  
+                    totalNotes: totalNotesCount  
+                },  
+                projects: userProjects  
+            };  
 
-        const downloadLink = document.createElement("a");  
-        downloadLink.href = url;  
-        downloadLink.download = `wolf-workspace-backup-${new Date().toISOString().slice(0, 10)}.json`;  
-          
-        document.body.appendChild(downloadLink);  
-        downloadLink.click();  
-        document.body.removeChild(downloadLink);  
-        URL.revokeObjectURL(url);  
+            const jsonString = JSON.stringify(dataToExport, null, 2);  
+            const blob = new Blob([jsonString], { type: "application/json" });  
+            const url = URL.createObjectURL(blob);  
 
-        showToast("📥 Refined workspace backup exported successfully!");  
-    } catch (error) {  
-        console.error("Export failed:", error);  
-        showToast("Failed to export backup.", false);  
-    }  
-});
+            const downloadLink = document.createElement("a");  
+            downloadLink.href = url;  
+            downloadLink.download = `wolf-workspace-backup-${new Date().toISOString().slice(0, 10)}.json`;  
+              
+            document.body.appendChild(downloadLink);  
+            downloadLink.click();  
+            document.body.removeChild(downloadLink);  
+            URL.revokeObjectURL(url);  
 
+            console.log("🐺 Workspace backup exported successfully for key:", projectStorageKey);
+            if (typeof showToast === 'function') {
+                showToast("📥 Refined workspace backup exported successfully!");
+            }
+        } catch (error) {  
+            console.error("❌ Export failed:", error);  
+            if (typeof showToast === 'function') {
+                showToast("Failed to export backup.", false);  
+            } else {
+                alert("Export failed: " + error.message);
+            }
+        }  
+    });
+    console.log("🐺 exportBackupBtn event listener attached.");
+} else {
+    console.warn("⚠️ exportBackupBtn element not found in DOM.");
 }
 
 // 2. IMPORT / RESTORE BACKUP FROM JSON FILE
@@ -3125,34 +3311,56 @@ function showOnlyView(targetViewId) {
         'settingsView', 
         'trashModal', 
         'quickCaptureModal',
-        'authModal'
+        'authModal',
+        'loginView' // Added loginView so it's never accidentally hidden
     ];
+
+    let foundMatch = false;
 
     allContainers.forEach(id => {
         const el = document.getElementById(id);
         if (el) {
             if (id === targetViewId) {
                 el.classList.remove('hidden');
+                // Ensure modals or special blocks display properly if targeted
+                if (id.includes('Modal') || id === 'authModal' || id === 'loginView') {
+                    el.style.display = 'block';
+                }
+                foundMatch = true;
             } else {
                 el.classList.add('hidden');
+                if (id.includes('Modal') || id === 'authModal' || id === 'loginView') {
+                    el.style.display = 'none';
+                }
             }
         }
     });
+
+    if (!foundMatch && targetViewId) {
+        console.warn(`⚠️ showOnlyView called with unknown or missing targetViewId: "${targetViewId}".`);
+    }
 }
+
 // ========================================
-// ROBUST MAIN VIEW & SETTINGS SWITCHER
+// 🐺 ROBUST MAIN VIEW & SETTINGS SWITCHER
 // ========================================
 
 function showOnlyMainView(targetViewId) {
     const dashboardView = document.getElementById('dashboardView');
     const projectWorkspace = document.getElementById('projectWorkspace');
     const exportView = document.getElementById('exportView');
+    const authModal = document.getElementById('authModal');
+    const loginView = document.getElementById('loginView');
 
     // Hide all primary top-level views first
-    [dashboardView, projectWorkspace, exportView].forEach(el => {
-        if (el) el.classList.add('hidden');
+    [dashboardView, projectWorkspace, exportView, authModal, loginView].forEach(el => {
+        if (el) {
+            el.classList.add('hidden');
+            if (el === authModal) el.style.display = 'none';
+        }
     });
 
+    // Handle known views safely
     if (targetViewId === 'dashboardView' && dashboardView) {
         dashboardView.classList.remove('hidden');
     } else if (targetViewId === 'settingsView') {
@@ -3163,8 +3371,29 @@ function showOnlyMainView(targetViewId) {
         }
     } else if (targetViewId === 'projectWorkspace' && projectWorkspace) {
         projectWorkspace.classList.remove('hidden');
+    } else if (targetViewId === 'authModal' && authModal) {
+        authModal.classList.remove('hidden');
+        authModal.style.display = 'block';
+    } else if (targetViewId === 'loginView' && loginView) {
+        loginView.classList.remove('hidden');
+    } else {
+        // SAFE FALLBACK: If an unknown view or null is passed, never leave the screen blank!
+        console.warn(`⚠️ showOnlyMainView received unknown or missing targetViewId: "${targetViewId}". Defaulting to safe view.`);
+        
+        // If user has a session, show dashboard; otherwise show login
+        const savedUser = localStorage.getItem('wolf_current_user');
+        if (savedUser && dashboardView) {
+            dashboardView.classList.remove('hidden');
+        } else {
+            if (loginView) loginView.classList.remove('hidden');
+            if (authModal) {
+                authModal.classList.remove('hidden');
+                authModal.style.display = 'block';
+            }
+        }
     }
 }
+
 // ========================================
 // WOLF WORKSPACE — PASSWORD RECOVERY & AUTH SYSTEM
 // ========================================
@@ -3226,49 +3455,86 @@ if (forgotPasswordForm) {
         }
     });
 }
+// ========================================
+// 🐺 SYNCHRONIZED BOOT & AUTH HANDOFF
+// ========================================
 
-// Auth State Monitor
+document.addEventListener("DOMContentLoaded", () => {
+    console.log("🐺 Instant render triggered...");
+
+    const authModal = document.getElementById('authModal');
+    const dashboardView = document.getElementById('dashboardView');
+    const projectWorkspace = document.getElementById('projectWorkspace');
+    const loginView = document.getElementById('loginView');
+    const loader = document.getElementById("appLoader");
+
+    // Check logout flag
+    if (sessionStorage.getItem('wolf_logged_out') === 'true') {
+        localStorage.removeItem('wolf_current_user');
+    }
+
+    const savedUser = localStorage.getItem('wolf_current_user');
+
+    if (savedUser) {
+        // If we have a cached local user, go straight to dashboard seamlessly
+        if (authModal) authModal.classList.add('hidden');
+        if (projectWorkspace) projectWorkspace.classList.add('hidden');
+        if (dashboardView) dashboardView.classList.remove('hidden');
+
+        if (typeof loadProjects === 'function') loadProjects();
+        if (typeof renderDashboard === 'function') renderDashboard();
+        console.log("🐺 Instant load: Dashboard displayed from local cache.");
+    } else {
+        // If no cached user, hold off and show login, but let Firebase auth check quickly confirm
+        console.log("🐺 Instant load: No local user cache. Awaiting auth state...");
+        if (dashboardView) dashboardView.classList.add('hidden');
+        if (projectWorkspace) projectWorkspace.classList.add('hidden');
+        if (authModal) {
+            authModal.classList.remove('hidden');
+            authModal.style.display = 'block';
+        }
+        if (loginView) loginView.classList.remove('hidden');
+    }
+
+    if (loader) loader.remove();
+});
+
+// GUARDED FIREBASE AUTH MONITOR
 if (typeof auth !== 'undefined') {
     auth.onAuthStateChanged((user) => {
-        const authModal = document.getElementById('authModal');
-        const dashboardView = document.getElementById('dashboardView');
-        const projectWorkspace = document.getElementById('projectWorkspace');
-        
+        if (sessionStorage.getItem('wolf_logged_out') === 'true') {
+            console.log("🐺 Ignoring Firebase auth: active logout flag set.");
+            return;
+        }
+
         if (user && user.emailVerified) {
+            console.log("🐺 Firebase Auth State: Verified active user found:", user.email);
+            // Save user locally so future boots are instant without flashing
+            localStorage.setItem('wolf_current_user', JSON.stringify({
+                email: user.email,
+                displayName: user.displayName || user.email.split('@')[0]
+            }));
+            
             if (typeof syncProfileAndHideModal === 'function') {
                 syncProfileAndHideModal(user);
             }
         } else {
-            if (dashboardView) dashboardView.classList.add('hidden');
-            if (projectWorkspace) projectWorkspace.classList.add('hidden');
-            if (authModal) authModal.classList.remove('hidden');
-            
-            const loginView = document.getElementById('loginView');
-            const signupView = document.getElementById('signupView');
-            const verifyView = document.getElementById('verifyView');
-            const forgotPassView = document.getElementById('forgotPasswordView');
-
-            loginView?.classList.remove('hidden');
-            signupView?.classList.add('hidden');
-            verifyView?.classList.add('hidden');
-            forgotPassView?.classList.add('hidden');
+            console.log("🐺 Firebase Auth State: No active session.");
+            // Only clear if we aren't expecting a session
         }
     });
 }
 
-document.addEventListener("DOMContentLoaded", () => {
-    const loader = document.getElementById("appLoader");
+// ========================================
+// 🐺 OFFLINE / ONLINE STATUS DETECTOR
+// ========================================
 
-    // Load local projects on boot
-    if (typeof loadProjects === "function") loadProjects();
-    if (typeof renderDashboard === "function") renderDashboard();
+window.addEventListener('online', () => {
+    console.log("🌐 Connection restored. Cloud services online.");
+    showToast ? showToast("Back online - syncing cloud...", "success") : console.log("Back online");
+});
 
-    // Smoothly dismiss the wolf loader after full initialization
-    if (loader) {
-        setTimeout(() => {
-            loader.classList.add("fade-out");
-            setTimeout(() => loader.remove(), 650);
-        }, 750); 
-    }
-    console.log("🐺 Wolf Workspace is ready.");
+window.addEventListener('offline', () => {
+    console.log("⚡ Connection lost. Running in local offline mode.");
+    showToast ? showToast("Offline mode - using local storage", "info") : console.log("Offline mode");
 });

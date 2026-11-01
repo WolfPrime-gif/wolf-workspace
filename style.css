@@ -3358,11 +3358,12 @@ body, main {
     letter-spacing: 0.5px;
 }
 
-/* Dismiss modifier */
+/* Dismiss modifier — Explicitly cuts the rendering tree to avoid overlays */
 .app-loader.fade-out {
-    opacity: 0;
-    visibility: hidden;
-    pointer-events: none;
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+    display: none !important; /* <--- THIS PREVENTS THE BLANK OVERLAY FROM BLOCKING THE LOGIN SCREEN */
 }
 
 /* Animations */
@@ -3381,4 +3382,72 @@ body, main {
     0% { transform: translateX(-100%); }
     50% { transform: translateX(0%); }
     100% { transform: translateX(100%); }
+}
+/*THE [X] BUTTON FIX LAYOUT */
+.modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between; /* Pushes title to the left, [x] button to the right */
+    width: 100%;
+    margin-bottom: 15px; /* Adjust spacing below the header if needed */
+}
+
+/* Ensure headings inside modal headers don't push buttons down */
+.modal-header h2, 
+.modal-header h3 {
+    margin: 0;
+    font-size: 1.25rem;
+}
+
+/* ========================================
+   MODAL CLOSE BUTTON (THEME AWARE)
+   ======================================== */
+.modal-header button[aria-label="Close"],
+.modal-header .close-btn {
+    background: var(--accent, #168cff); /* Automatically adopts active theme accent */
+    color: #ffffff;
+    border: none;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    font-size: 20px;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+    transition: background 0.2s, transform 0.1s, filter 0.2s;
+}
+
+.modal-header button[aria-label="Close"]:hover,
+.modal-header .close-btn:hover {
+    filter: brightness(1.15); /* Brightens nicely on hover */
+}
+
+.modal-header button[aria-label="Close"]:active,
+.modal-header .close-btn:active {
+    transform: scale(0.95);
+}
+
+/*EXPORT & IMPORT BUTTON IN SETTINGS*/
+.settings-group {
+    background: var(--card-bg, rgba(255, 255, 255, 0.03));
+    border: 1px solid var(--border, rgba(255, 255, 255, 0.1));
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 20px;
+}
+
+.settings-desc {
+    font-size: 0.88rem;
+    color: var(--text-muted, #a0aec0);
+    margin-top: 4px;
+}
+
+.backup-btn-group button {
+    flex: 1;
+    min-width: 140px;
+    padding: 10px 14px;
+    font-weight: 600;
 }

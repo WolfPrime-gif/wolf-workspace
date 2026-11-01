@@ -37,6 +37,7 @@
 
     </script>
 
+
 </head>
 
 <body>
@@ -286,24 +287,7 @@
                 <button type="submit">+ Create Project</button>
             </form>
         </section>
-      <!-- WORKSPACE BACKUP & RESTORE PANEL -->
-        <section class="backup-restore-section">
-            <div class="backup-actions-card">
-                <div>
-                    <h3>🛡️ Workspace Data Backup</h3>
-                    <p>Export or restore your projects, tasks, and notes securely.</p>
-                </div>
-                <div class="backup-buttons">
-                    <button type="button" id="exportBackupBtn" class="secondary-btn">📥 Export Backup</button>
-                    <label for="importBackupInput" class="import-file-label secondary-btn">
-                        📤 Restore Backup
-                    </label>
-                    <input type="file" id="importBackupInput" accept=".json" style="display: none;">
-                </div>
-            </div>
-        </section>
-
-     
+      
       <!-- GLOBAL SEARCH BAR -->
         <section class="dashboard-search-section">
             <input
@@ -558,8 +542,23 @@
                     <button type="button" id="settingsExportBtn" class="file-download-btn">📥 Export Backup</button>
                     <button type="button" id="settingsResetBtn" class="file-delete-btn">⚠️ Factory Reset</button>
                 </div>
+            </div> 
+          <!-- WORKSPACE BACKUP & RESTORE PANEL -->
+        <div class="backup-restore-section">
+            <div class="backup-actions-card">
+                <div>
+                    <h3>🛡️ Workspace Data Backup</h3>
+                    <p>Export or restore your projects, tasks, and notes securely.</p>
+                </div>
+                <div class="backup-buttons">
+                    <button type="button" id="exportBackupBtn" class="secondary-btn">📥 Export Backup</button>
+                    <label for="importBackupInput" class="import-file-label secondary-btn">
+                        📤 Restore Backup
+                    </label>
+                    <input type="file" id="importBackupInput" accept=".json" style="display: none;">
+                </div>
             </div>
-
+        </div>
             <!-- APPEARANCE & PREFERENCES CARD -->
             <div class="settings-card">
                 <h3>🎨 Appearance & Themes</h3>
@@ -592,7 +591,6 @@
         </button>
     </div>
 </div>
-
             <!-- APP INFORMATION CARD -->
             <div class="settings-card">
                 <h3>🐺 About Wolf Workspace</h3>
@@ -616,7 +614,6 @@
         </div>
     </div>
 </div>
-
 <!-- FEEDBACK & DEVELOPER AREA -->
 <div class="settings-card" style="margin-top: 20px;">
     <h3>💬 Feedback & Support</h3>
@@ -1112,9 +1109,9 @@
         </div>
     </div>
 </div>
-
+<div id="appLoader">...</div>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="app.js"></script>
+    <script src="app.js" defer></script>
 
 </body>
 </html>
