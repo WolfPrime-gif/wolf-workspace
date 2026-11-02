@@ -6,26 +6,48 @@
 
 const $ = (selector) => document.querySelector(selector);
 
-function getUserStorageKey(key) {
-    try {
-        const storedUser = localStorage.getItem('wolf_current_user');
-        if (!storedUser) return `wolf_guest_${key}`;
-        
-        const currentUser = JSON.parse(storedUser);
-        const userEmail = (currentUser && currentUser.email) ? currentUser.email : 'guest';
-        return `wolf_${userEmail}_${key}`;
-    } catch (e) {
-        console.error("Storage key error:", e);
-        return `wolf_guest_${key}`;
+// ========================================
+// 🐺 BULLETPROOF USER-SCOPED STORAGE KEY GENERATOR
+// ========================================
+
+function getUserStorageKey(baseKey) {
+    let email = "guest";
+    
+    // Check localStorage first
+    let currentUser = localStorage.getItem('wolf_current_user');
+    
+    if (currentUser) {
+        try {
+            if (currentUser.startsWith('{')) {
+                const parsed = JSON.parse(currentUser);
+                email = parsed.email || parsed.userEmail || "guest";
+            } else {
+                email = currentUser;
+            }
+        } catch (e) {
+            email = currentUser;
+        }
+    } else if (typeof auth !== 'undefined' && auth.currentUser && auth.currentUser.email) {
+        // Fallback directly to Firebase active auth session if localStorage is lagging
+        email = auth.currentUser.email;
     }
+
+    const safeIdentifier = email.trim().toLowerCase().replace(/[@.]/g, '_');
+    return `wolf_${safeIdentifier}_${baseKey}`;
 }
 
-// 3. Synchronous local loader utilizing user-specific storage key
+// ========================================
+// 🐺 SAFE LOCAL LOADER (NO PHANTOM DEFAULT PROJECTS)
+// ========================================
 function loadProjectsFromLocal() {
     try {
         const STORAGE_KEY = getUserStorageKey('projects');
         const saved = localStorage.getItem(STORAGE_KEY);
+        
+        // If nothing is explicitly saved in THIS user's storage, return an empty array [] 
+        // DO NOT return a hardcoded demo project template here!
         if (!saved) return [];  
+        
         const parsed = JSON.parse(saved);  
         return Array.isArray(parsed) ? parsed : [];
     } catch (error) {
@@ -33,7 +55,6 @@ function loadProjectsFromLocal() {
         return [];
     }
 }
-
 // 4. Synchronous local saver utilizing user-specific storage key
 function saveProjectsToLocal() {
     try {
@@ -521,7 +542,9 @@ function openProject(projectId) {
         showDashboard();
         return;
     }
-
+ if (typeof updateTrashUI === 'function') {
+        updateTrashUI(); // <--- Add this here so it updates the moment you switch projects!
+    }
     const dashboardView = document.getElementById('dashboardView');
     const projectWorkspace = document.getElementById('projectWorkspace');
 
@@ -711,7 +734,6 @@ confirmDeleteProject.addEventListener("click", () => {
 
     // ---> MOVE TO TRASH BIN <---
     moveItemToTrash("project", project);
-
     projects.splice(projectIndex, 1);  
     saveProjects();
     closeDeleteModalWindow();  
@@ -913,7 +935,7 @@ confirmDeleteTask.addEventListener("click", () => {
     const taskToDelete = project.tasks.find(task => task.id === deletingTaskId);
     if (taskToDelete) {
         // ---> MOVE TO TRASH BIN <---
-        moveItemToTrash("task", taskToDelete);
+     moveItemToTrash("task", taskToDelete, project.id);
     }
 
     project.tasks = project.tasks.filter(task => task.id !== deletingTaskId);
@@ -1110,7 +1132,7 @@ const deleteButton = createButton("Delete", "delete-note-button", () => {
 
     if (confirmed) {
         // Move to trash bin
-        moveItemToTrash("note", noteToDelete);
+      moveItemToTrash("note", note, project.id);
         
         showToast(`🗑️ "${noteToDelete.title || 'Untitled'}" moved to trash!`, true);
         
@@ -1581,13 +1603,14 @@ function renderFiles() {
             const confirmed = await showCustomConfirm("🗑️ Delete File", `Are you sure you want to delete "${file.name}"?`);
             if (confirmed) {
                 // ---> MOVE TO TRASH BIN <---
-                moveItemToTrash("file", file);
+                moveItemToTrash("file", file, project.id);
 
                 project.files = project.files.filter(f => f.id !== file.id);
                 saveProjects();
                 renderFiles();
                 showToast(`🗑️ "${file.name}" moved to trash!`);
             }
+
         });
 
         actionsDiv.append(downloadBtn, deleteBtn);
@@ -1834,7 +1857,6 @@ if (checkVerifyBtn) {
 // ========================================
 // 🐺 LOGIN FORM HANDLER WITH LOADING STATE
 // ========================================
-
 if (loginForm) {
     loginForm.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -1883,8 +1905,32 @@ if (loginForm) {
                 submitBtn.innerHTML = "🐺 Welcome back!";
             }
 
-            // 4. Save user session and trigger live UI rendering
-            await handleLogin(user.email);
+            // ========================================
+            // 🐺 4. SECURE PRE-LOAD & SESSION SYNC
+            // ========================================
+            localStorage.setItem('wolf_current_user', user.email);
+            // Load user-scoped data into memory FIRST
+            if (typeof loadProjectsFromLocal === 'function') {
+                projects = loadProjectsFromLocal();
+            }
+            if (typeof loadTrash === 'function') {
+                loadTrash();
+            }
+
+            // Render dashboard data while hidden to prevent zero-project flash
+            if (typeof renderDashboard === 'function') {
+                renderDashboard();
+            }
+            if (typeof updateTrashUI === 'function') {
+                updateTrashUI();
+            }
+
+            // Finally, call handleLogin or switch to the main dashboard view
+            if (typeof handleLogin === 'function') {
+                await handleLogin(user.email);
+            } else {
+                showOnlyMainView('dashboardView');
+            }
 
             loginSuccessful = true;
 
@@ -1904,35 +1950,57 @@ if (loginForm) {
         }
     });
 }
+
 // ========================================
 // 🐺 ROBUST LOGOUT HANDLER (NO BLANK PAGES)
 // ========================================
-
 async function handleLogout() {
     try {
-        console.log("🐺 Terminating session...");
+        console.log("🐺 Executing clean secure logout...");
 
-        // 1. Flag explicitly in session storage that a manual logout occurred
+        // 1. Set flags and clear cached user
         sessionStorage.setItem('wolf_logged_out', 'true');
         localStorage.removeItem('wolf_current_user');
-        localStorage.removeItem('firebase:authUser');
 
+        // 2. Wipe memory variables completely
         if (typeof projects !== 'undefined') projects = [];
+        if (typeof trashBin !== 'undefined') trashBin = [];
         if (typeof activeProjectId !== 'undefined') activeProjectId = null;
 
-        // 2. Sign out from Firebase Auth if available
-        if (typeof auth !== 'undefined' && typeof auth.signOut === 'function') {
+        // 3. Sign out from Firebase
+        if (typeof auth !== 'undefined' && auth.signOut) {
             await auth.signOut();
         }
-    } catch (err) {
-        console.error("❌ Firebase signout error:", err);
-    } finally {
-        console.log("🐺 Session cleared. Reloading interface...");
+
+        // 4. FIX BLANK SCREEN: Force hide dashboard/workspace & show login view explicitly
+        const dashboardView = document.getElementById('dashboardView');
+        const projectWorkspace = document.getElementById('projectWorkspace');
+        const authModal = document.getElementById('authModal');
+        const loginView = document.getElementById('loginView');
+
+        if (dashboardView) dashboardView.classList.add('hidden');
+        if (projectWorkspace) projectWorkspace.classList.add('hidden');
+
+        if (authModal) {
+            authModal.classList.remove('hidden');
+            authModal.style.display = 'block'; // Ensure block display overrides any flex/hidden issues
+        }
+        if (loginView) {
+            loginView.classList.remove('hidden');
+        }
+
+        // 5. Reset UI states
+        if (typeof renderProjects === 'function') renderProjects();
+        if (typeof updateTrashUI === 'function') updateTrashUI();
+
+        if (typeof showToast === 'function') {
+            showToast("🔒 Logged out securely.");
+        }
         
-        // 3. Clean reload
-        setTimeout(() => {
-            window.location.reload();
-        }, 150);
+        console.log("🐺 Logout complete. Login view restored.");
+    } catch (err) {
+        console.error("❌ Logout error:", err);
+        window.location.reload(); // Hard fallback if anything fails
     }
 }
 
@@ -1957,11 +2025,11 @@ document.addEventListener("click", async (e) => {
         if (typeof handleLogout === 'function') {
             await handleLogout();
         } else {
-            console.error("❌ handleLogout function is not defined!");
+            console.error("❌ handleLogout function is not defined! Executing fallback logout...");
+            await fallbackLogout();
         }
     }
 });
-
 
 });
 // Helper: Add Password Show/Hide Toggles
@@ -2069,14 +2137,21 @@ function syncProfileAndHideModal(user) {
 }
       
 function renderSettings() {
-    // 1. Storage Calculation
+    // 1. Account-Scoped Storage Calculation
     try {
         let totalBytes = 0;
+        const userPrefix = getUserStorageKey(""); // 🐺 Gets the current user's safe prefix (e.g., wolf_user_gmail_com_)
+
         for (let i = 0; i < localStorage.length; i++) {
             const key = localStorage.key(i);
-            const value = localStorage.getItem(key);
-            totalBytes += key.length + (value ? value.length : 0);
+            
+            // Only count keys belonging to this active account
+            if (key && key.startsWith(userPrefix)) {
+                const value = localStorage.getItem(key);
+                totalBytes += key.length + (value ? value.length : 0);
+            }
         }
+
         const totalKB = (totalBytes / 1024).toFixed(1);
         const percentage = Math.min(100, (totalKB / 5120) * 100).toFixed(1);
 
@@ -2103,8 +2178,9 @@ if (settingsExportBtn) {
         if (exportBtn) exportBtn.click();
     });
 }
+
 // ========================================
-// 🐺 USER-SCOPED FACTORY RESET BUTTON LISTENER
+// 🐺 FIXED FACTORY RESET & CLEAN INITIALIZATION
 // ========================================
 
 const settingsResetBtn = document.getElementById("settingsResetBtn");
@@ -2116,18 +2192,17 @@ if (settingsResetBtn) {
             
         if (confirmed) {
             try {
-                // Target ONLY the current user's specific storage keys using your helper
+                // 1. Target and clear the current user's specific storage key
                 const projectStorageKey = getUserStorageKey('projects');
-                
-                // Remove only this user's data (instead of localStorage.clear() which nukes everyone)
                 localStorage.removeItem(projectStorageKey);
                 
-                // Keep session logout state clean if needed, or clear user profile cache for this account
-                localStorage.removeItem('wolf_current_user');
+                // 2. Clear active memory variables immediately so nothing lingers on screen
+                projects = [];
+                activeProjectId = null;
                 
-                // Reset active memory variables safely
-                if (typeof projects !== 'undefined') projects = [];
-                if (typeof activeProjectId !== 'undefined') activeProjectId = null;
+                // 3. Immediately clear the UI list so the user sees a blank workspace instantly
+                if (typeof renderProjects === 'function') renderProjects();
+                if (typeof renderDashboard === 'function') renderDashboard();
 
                 console.log("🐺 Scoped factory reset completed successfully.");
                 
@@ -2137,11 +2212,14 @@ if (settingsResetBtn) {
             } catch (err) {
                 console.error("❌ Factory reset error:", err);
             } finally {
-                window.location.reload();
+                // 4. Force a clean reload after a brief moment
+                setTimeout(() => {
+                    window.location.reload();
+                }, 300);
             }
         }
     });
-    console.log("🐺 settingsResetBtn event listener attached.");
+  console.log("🐺 settingsResetBtn event listener attached.");
 }
 
 // Helper: Update Auth UI based on user session status
@@ -2460,7 +2538,7 @@ const reader = new FileReader();
 }
 
 // ========================================
-// TRASH BIN RECOVERY SYSTEM
+// PROJECT-SCOPED TRASH BIN & UI SYSTEM
 // ========================================
 
 const trashModal = $("#trashModal");
@@ -2473,48 +2551,67 @@ const trashItemsList = $("#trashItemsList");
 
 let trashBin = JSON.parse(localStorage.getItem(getUserStorageKey("trash"))) || [];
 
-
-// Function to save trash bin locally
+// Function to save trash bin locally with user-scoped key
 function saveTrash() {
     localStorage.setItem(getUserStorageKey("trash"), JSON.stringify(trashBin));
     updateTrashUI();
 }
-// Function to load trash bin
+
+// Function to load trash bin with user-scoped key
 function loadTrash() {
     trashBin = JSON.parse(localStorage.getItem(getUserStorageKey("trash"))) || [];
+    updateTrashUI();
     return trashBin;
 }
+
+// 🐺 Scoped Trash UI Counter Updater
 function updateTrashUI() {
     const trashCountText = $("#trashCountText");
     if (trashCountText) {
-        trashCountText.textContent = `${trashBin.length} ${trashBin.length === 1 ? "item" : "items"} in trash`;
+        const currentActiveId = typeof activeProjectId !== 'undefined' ? activeProjectId : null;
+
+        // Count only items belonging to the active project (or deleted projects)
+        const visibleCount = trashBin.filter(entry => {
+            if (entry.type === "project") return true;
+            return entry.originalProjectId === currentActiveId;
+        }).length;
+
+        trashCountText.textContent = `${visibleCount} ${visibleCount === 1 ? "item" : "items"} in trash`;
     }
 }
 
-// Push deleted item into trash bin
-function moveItemToTrash(type, item) {
+// Push deleted item into trash bin with parent project tracking
+function moveItemToTrash(type, item, parentProjectId = null) {
     trashBin.push({
-        trashId: Date.now().toString(),
-        type: type, // "project", "task", or "note"
+        trashId: Date.now().toString() + Math.random().toString(36).substring(2, 5),
+        type: type, // "project", "task", "note", or "file"
         data: item,
+        originalProjectId: parentProjectId || (typeof activeProjectId !== 'undefined' ? activeProjectId : null),
         deletedAt: new Date().toLocaleDateString()
     });
     saveTrash();
 }
 
-// Render list of deleted items inside trash modal
+// Render list of deleted items inside trash modal (Project-Scoped)
 function renderTrashModal() {
     if (!trashItemsList) return;
     trashItemsList.replaceChildren();
 
-    if (trashBin.length === 0) {
+    const currentActiveId = typeof activeProjectId !== 'undefined' ? activeProjectId : null;
+
+    const visibleTrashItems = trashBin.filter(entry => {
+        if (entry.type === "project") return true;
+        return entry.originalProjectId === currentActiveId;
+    });
+
+    if (visibleTrashItems.length === 0) {
         trashItemsList.appendChild(
-            createElement("div", "empty-state", "📭 Trash bin is clean and empty.")
+            createElement("div", "empty-state", "📭 Trash bin is clean and empty for this project.")
         );
         return;
     }
 
-    trashBin.forEach(entry => {
+    visibleTrashItems.forEach(entry => {
         const card = createElement("div", "trash-item-card");
 
         const info = createElement("div", "trash-item-info");
@@ -2525,12 +2622,10 @@ function renderTrashModal() {
 
         const actions = createElement("div", "trash-item-actions");
         
-        // Restore Button
         const restoreBtn = createButton("↺ Restore", "restore-btn", () => {
             restoreItemFromTrash(entry.trashId);
         });
 
-        // Permanent Delete Button
         const permDeleteBtn = createButton("Delete", "file-delete-btn", () => {
             trashBin = trashBin.filter(item => item.trashId !== entry.trashId);
             saveTrash();
@@ -2543,9 +2638,8 @@ function renderTrashModal() {
         trashItemsList.appendChild(card);
     });
 }
-
 // ========================================
-// REFINED TRASH RESTORE SYSTEM
+// REFINED TRASH RESTORE SYSTEM (PROJECT-SCOPED)
 // ========================================
 
 function restoreItemFromTrash(trashId) {
@@ -2559,40 +2653,48 @@ function restoreItemFromTrash(trashId) {
         // Restore project directly to dashboard list
         projects.push(originalData);
         saveProjects();
-        renderDashboard();
+        if (typeof renderDashboard === "function") renderDashboard();
     } 
     else if (entry.type === "task" || entry.type === "note" || entry.type === "file") {
-        let project = getActiveProject();
+        // 🐺 Find the exact original project using the stored parent ID, falling back to active project if needed
+        let targetProject = null;
+        
+        if (entry.originalProjectId) {
+            targetProject = projects.find(p => p.id === entry.originalProjectId);
+        }
+        
+        // If original project was deleted or not found, fall back to current active project
+        if (!targetProject) {
+            targetProject = getActiveProject();
+        }
 
-        // If no project is currently open, attempt to restore to the first available project or ask
-        if (!project) {
+        if (!targetProject) {
             if (projects.length > 0) {
-                project = projects[0]; // Default fallback to first project
-                activeProjectId = project.id;
+                targetProject = projects[0]; // Default fallback to first project
             } else {
-                showToast("⚠️ Create or open a project first to restore this item.", false);
+                showToast("⚠️ The original project no longer exists and no active projects are available.", false);
                 return;
             }
         }
 
         if (entry.type === "task") {
-            if (!Array.isArray(project.tasks)) project.tasks = [];
-            project.tasks.push(originalData);
+            if (!Array.isArray(targetProject.tasks)) targetProject.tasks = [];
+            targetProject.tasks.push(originalData);
         } 
         else if (entry.type === "note") {
-            if (!Array.isArray(project.notes)) project.notes = [];
-            project.notes.push(originalData);
+            if (!Array.isArray(targetProject.notes)) targetProject.notes = [];
+            targetProject.notes.push(originalData);
         }
         else if (entry.type === "file") {
-            if (!Array.isArray(project.files)) project.files = [];
-            project.files.push(originalData);
+            if (!Array.isArray(targetProject.files)) targetProject.files = [];
+            targetProject.files.push(originalData);
         }
 
         saveProjects();
         
-        // If workspace is active, refresh it
-        if (typeof renderWorkspace === "function" && projectWorkspace && !projectWorkspace.classList.contains("hidden")) {
-            renderWorkspace();
+        // Refresh workspace if currently viewing the project it was restored into
+        if (typeof renderWorkspace === "function" && activeProjectId === targetProject.id) {
+            renderWorkspace(targetProject.id);
             if (entry.type === "file" && typeof renderFiles === "function") renderFiles();
         }
     }
@@ -2602,7 +2704,7 @@ function restoreItemFromTrash(trashId) {
     saveTrash();
     renderTrashModal();
     
-    showToast(`↺ Restored successfully!`);
+    showToast(`↺ Restored successfully to its original project!`);
 }
 
 // Open Trash Modal
@@ -2613,25 +2715,43 @@ if (viewTrashBtn) {
     });
 }
 
-// Empty Trash Action (Settings & Modal)
+// ========================================
+// PROJECT-SCOPED EMPTY TRASH HANDLER
+// ========================================
+
 const handleEmptyTrash = async () => {
-    if (trashBin.length === 0) {
-        showToast("🗑️ Trash bin is already empty.");
+    // 🐺 Get the current active project ID
+    const currentActiveId = typeof activeProjectId !== 'undefined' ? activeProjectId : null;
+
+    // Filter to find what items would be affected by emptying trash for this view
+    const itemsInCurrentContext = trashBin.filter(entry => {
+        if (entry.type === "project") return false; // Keep deleted projects safe from quick project-level empty
+        return entry.originalProjectId === currentActiveId;
+    });
+
+    if (itemsInCurrentContext.length === 0) {
+        showToast("🗑️ Trash bin is already empty for this project.");
         return;
     }
 
     const confirmed = await showCustomConfirm(
-        "🗑️ Empty Trash Bin",
-        "This will permanently remove all items in the trash. This cannot be undone."
+        "🗑️ Empty Project Trash",
+        "This will permanently remove all deleted tasks, notes, and files for this project. This cannot be undone."
     );
 
     if (confirmed) {
-        trashBin = [];
+        // 🐺 Keep items from OTHER projects, remove only items matching the current active project ID
+        trashBin = trashBin.filter(entry => {
+            if (entry.type === "project") return true; // Preserve deleted projects
+            return entry.originalProjectId !== currentActiveId;
+        });
+
         saveTrash();
         renderTrashModal();
-        showToast("💥 Trash bin emptied permanently.");
+        showToast("💥 Project trash bin emptied permanently.");
     }
 };
+
 // ========================================
 // TRASH BIN MODAL CLOSE HANDLERS
 // ========================================
@@ -3335,7 +3455,10 @@ function showOnlyView(targetViewId) {
             }
         }
     });
-
+ // 🐺 Refresh the project-scoped trash count whenever views shift
+    if (typeof updateTrashUI === 'function') {
+        updateTrashUI();
+    }
     if (!foundMatch && targetViewId) {
         console.warn(`⚠️ showOnlyView called with unknown or missing targetViewId: "${targetViewId}".`);
     }
@@ -3344,7 +3467,6 @@ function showOnlyView(targetViewId) {
 // ========================================
 // 🐺 ROBUST MAIN VIEW & SETTINGS SWITCHER
 // ========================================
-
 function showOnlyMainView(targetViewId) {
     const dashboardView = document.getElementById('dashboardView');
     const projectWorkspace = document.getElementById('projectWorkspace');
@@ -3380,7 +3502,6 @@ function showOnlyMainView(targetViewId) {
         // SAFE FALLBACK: If an unknown view or null is passed, never leave the screen blank!
         console.warn(`⚠️ showOnlyMainView received unknown or missing targetViewId: "${targetViewId}". Defaulting to safe view.`);
         
-        // If user has a session, show dashboard; otherwise show login
         const savedUser = localStorage.getItem('wolf_current_user');
         if (savedUser && dashboardView) {
             dashboardView.classList.remove('hidden');
@@ -3391,6 +3512,11 @@ function showOnlyMainView(targetViewId) {
                 authModal.style.display = 'block';
             }
         }
+    }
+
+    // 🐺 CRITICAL: Force the trash counter to update whenever views change
+    if (typeof updateTrashUI === 'function') {
+        updateTrashUI();
     }
 }
 
@@ -3476,16 +3602,31 @@ document.addEventListener("DOMContentLoaded", () => {
     const savedUser = localStorage.getItem('wolf_current_user');
 
     if (savedUser) {
-        // If we have a cached local user, go straight to dashboard seamlessly
+        // ========================================
+        // 🐺 1. SECURE PRE-LOAD (BEFORE REVEALING UI)
+        // ========================================
+        if (typeof loadProjectsFromLocal === 'function') {
+            projects = loadProjectsFromLocal();
+        } else if (typeof loadProjects === 'function') {
+            loadProjects();
+        }
+
+        if (typeof loadTrash === 'function') {
+            loadTrash();
+        }
+
+        // Render dashboard and trash counters in memory first
+        if (typeof renderDashboard === 'function') renderDashboard();
+        if (typeof updateTrashUI === 'function') updateTrashUI();
+
+        // Now go straight to dashboard seamlessly without a zero-project flash
         if (authModal) authModal.classList.add('hidden');
         if (projectWorkspace) projectWorkspace.classList.add('hidden');
         if (dashboardView) dashboardView.classList.remove('hidden');
 
-        if (typeof loadProjects === 'function') loadProjects();
-        if (typeof renderDashboard === 'function') renderDashboard();
-        console.log("🐺 Instant load: Dashboard displayed from local cache.");
+        console.log("🐺 Instant load: Dashboard displayed from local cache with pre-loaded data.");
     } else {
-        // If no cached user, hold off and show login, but let Firebase auth check quickly confirm
+        // If no cached user, hold off and show login
         console.log("🐺 Instant load: No local user cache. Awaiting auth state...");
         if (dashboardView) dashboardView.classList.add('hidden');
         if (projectWorkspace) projectWorkspace.classList.add('hidden');
@@ -3509,18 +3650,25 @@ if (typeof auth !== 'undefined') {
 
         if (user && user.emailVerified) {
             console.log("🐺 Firebase Auth State: Verified active user found:", user.email);
-            // Save user locally so future boots are instant without flashing
-            localStorage.setItem('wolf_current_user', JSON.stringify({
-                email: user.email,
-                displayName: user.displayName || user.email.split('@')[0]
-            }));
             
+            // Save user locally so future boots are instant without flashing
+            localStorage.setItem('wolf_current_user', user.email);
+            
+            // Ensure data is loaded if auth triggers post-load
+            if (typeof loadProjectsFromLocal === 'function') {
+                projects = loadProjectsFromLocal();
+            }
+            if (typeof loadTrash === 'function') {
+                loadTrash();
+            }
+            if (typeof renderDashboard === 'function') renderDashboard();
+            if (typeof updateTrashUI === 'function') updateTrashUI();
+
             if (typeof syncProfileAndHideModal === 'function') {
                 syncProfileAndHideModal(user);
             }
         } else {
             console.log("🐺 Firebase Auth State: No active session.");
-            // Only clear if we aren't expecting a session
         }
     });
 }
@@ -3538,3 +3686,4 @@ window.addEventListener('offline', () => {
     console.log("⚡ Connection lost. Running in local offline mode.");
     showToast ? showToast("Offline mode - using local storage", "info") : console.log("Offline mode");
 });
+

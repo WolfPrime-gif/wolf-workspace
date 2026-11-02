@@ -3451,3 +3451,59 @@ body, main {
     padding: 10px 14px;
     font-weight: 600;
 }
+/* 🐺 Flexible Trash Item Card Layout */
+.trash-item-card {
+    display: flex;
+    flex-direction: column; /* Stack info and actions nicely on smaller screens if needed, or row with wrapping */
+    align-items: flex-start;
+    justify-content: space-between;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+    gap: 10px;
+    transition: all 0.2s ease;
+}
+
+@media (min-width: 480px) {
+    .trash-item-card {
+        flex-direction: row; /* Side-by-side on wider screens */
+        align-items: center;
+    }
+}
+
+.trash-item-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+    min-width: 0; /* Crucial: allows text wrapping inside flex containers */
+    word-break: break-word; /* Prevents long file hashes/names from breaking layout */
+}
+
+.trash-item-title {
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: #e2e8f0;
+    white-space: normal; /* Allows text to wrap into multiple lines naturally */
+    overflow-wrap: break-word;
+}
+
+.trash-item-meta {
+    font-size: 0.75rem;
+    color: #94a3b8;
+}
+
+.trash-item-actions {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+    align-self: flex-end;
+}
+
+@media (min-width: 480px) {
+    .trash-item-actions {
+        align-self: center;
+    }
+}
